@@ -18,7 +18,9 @@ function decodePcm16(b64: string): Int16Array {
   // We use the buffer package in React Native to parse base64
   const Buffer = require("buffer").Buffer;
   const bin = Buffer.from(b64, "base64");
-  const pcm = new Int16Array(bin.buffer, bin.byteOffset, bin.length / 2);
+  // Guard against odd-length payloads — Int16Array requires an even byte count.
+  const evenLength = bin.length - (bin.length % 2);
+  const pcm = new Int16Array(bin.buffer, bin.byteOffset, evenLength / 2);
   return pcm;
 }
 

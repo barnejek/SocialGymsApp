@@ -9,6 +9,7 @@ export default function DashboardScreen() {
   const { user, logout } = useAuth();
   const stats = currentStats;
   const router = useRouter();
+  const firstName = user?.name.split(' ')[0] ?? 'there';
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
@@ -17,13 +18,13 @@ export default function DashboardScreen() {
         <View className="flex-row justify-between items-center mb-8">
           <View className="flex-row items-center">
             <View className="h-14 w-14 rounded-full bg-primary/20 items-center justify-center mr-4 overflow-hidden border-2 border-primary/50">
-              <Image 
-                source={{ uri: 'https://i.pravatar.cc/150?u=a042581f4e29026704d' }} 
+              <Image
+                source={require('../../../assets/images/alex-avatar.jpg')}
                 className="h-full w-full"
               />
             </View>
             <View>
-              <Text className="text-2xl font-bold text-foreground">Hi, Alex!</Text>
+              <Text className="text-2xl font-bold text-foreground">Hi, {firstName}!</Text>
               <Text className="text-muted-foreground mt-0.5">Ready to level up?</Text>
             </View>
           </View>

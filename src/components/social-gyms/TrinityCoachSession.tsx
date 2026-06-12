@@ -24,7 +24,9 @@ import {
 import type { Topic } from '../../lib/topics';
 import { CameraView } from 'expo-camera';
 
-const GEMINI_API_KEY = "dummy-key-for-now"; // Put env var here later
+// Set EXPO_PUBLIC_GEMINI_API_KEY in .env when the live engine is enabled.
+// For the VC demo the engine is mocked, so the fallback is never used for real calls.
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? "dummy-key-for-now";
 
 interface Props {
   topic: Topic;

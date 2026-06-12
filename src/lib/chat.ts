@@ -1,4 +1,9 @@
-import { toast } from "sonner";
+// NOTE: "sonner" is a web-only toast library and is not installed in the
+// mobile project. We log instead; swap in a native toast (e.g. burnt or
+// react-native-toast-message) when this client goes live.
+const toast = {
+  error: (msg: string) => console.warn("[SocialGyms]", msg),
+};
 
 export interface ChatMessage {
   role: "user" | "assistant";

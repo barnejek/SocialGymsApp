@@ -9,16 +9,18 @@ export function useSessionTimer(durationSec: number, running: boolean, onEnd: ()
     if (!running) return;
     setRemaining(durationSec);
     const start = Date.now();
-    const interval = window.setInterval(() => {
+    // Plain setInterval — `window.*` is a web idiom; in React Native the
+    // global timer functions are the portable choice.
+    const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - start) / 1000);
       const left = Math.max(0, durationSec - elapsed);
       setRemaining(left);
       if (left <= 0) {
-        window.clearInterval(interval);
+        clearInterval(interval);
         onEndRef.current();
       }
     }, 250);
-    return () => window.clearInterval(interval);
+    return () => clearInterval(interval);
   }, [running, durationSec]);
 
   const mm = Math.floor(remaining / 60);

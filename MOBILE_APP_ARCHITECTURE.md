@@ -1,6 +1,13 @@
 # Social Gyms - Mobile App Architecture
 
-This document provides a detailed breakdown of the Social Gyms Mobile App (built with Expo Router and React Native). 
+This document provides a detailed breakdown of the Social Gyms Mobile App (built with Expo Router and React Native).
+
+## 📌 Current Status (June 2026 — MIT EPGM VC pitch build)
+
+* **Backend is a mockup** (`src/lib/mockBackend.ts`, `src/lib/gamification.ts`). No Supabase connection on purpose — keep it that way until after the pitch.
+* **The live voice/video engine is intentionally disabled**: mic streaming in `useGeminiLive.ts` and the camera→WebView pipeline are commented out / stubbed because the native modules don't run under plain `npx expo start` (they need a dev client). Do not re-enable without reading `ToDo.md` §2, which documents the wiring gaps and the recommended integration path.
+* **`ToDo.md`** in this folder is the living improvement plan: bug changelog, engine integration plan, per-screen logic/personalization items, and visual design direction.
+* The leftover Expo starter template files (Explore screen, `themed-*` components, template hooks/theme) have been removed.
 
 The mobile application acts as a unified platform supporting three distinct products hiding inside a single codebase. It dynamically restructures its routing, dashboards, and training content based on the logged-in user's "persona".
 

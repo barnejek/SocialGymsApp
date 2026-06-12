@@ -18,7 +18,6 @@ export default function Index() {
   const [lessonLength, setLessonLength] = useState<LessonLength>(DEFAULT_LESSON_LENGTH);
   const { user, logout } = useAuth();
 
-  const handleStart = () => setStage("setup");
   const handleContinue = () => {
     if (!topicId) return;
     setStage("session");
@@ -91,11 +90,11 @@ export default function Index() {
           {stage === "session" && topicId && (
             <View className="flex-1 min-h-[800px]">
               <TrinityCoachSession
-                topic={topics.find((t: any) => t.id === topicId)!}
+                topic={topics.find((t) => t.id === topicId)!}
                 lessonLength={lessonLength}
                 active={stage === "session"}
-                onComplete={(r: any) => {
-                  recordSessionComplete(85); // Dummy presence score
+                onComplete={() => {
+                  recordSessionComplete(85); // Mock presence score until the scoring engine is live
                   setStage("results");
                 }}
               />

@@ -5,16 +5,21 @@ import { useAuth } from '../../components/AuthProvider';
 import { Play, Info, ShieldCheck, Heart } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
+// Mock per-goal progress; in production this comes from session history.
+const GOAL_PROGRESS = [40, 85, 60];
+
 export default function AutismHomeScreen() {
   const { user, logout } = useAuth();
   const router = useRouter();
+  const firstName = user?.name.split(' ')[0] ?? 'friend';
+  const iepGoals = user?.autismProfile?.iepGoals ?? [];
 
   return (
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <ScrollView className="flex-1 px-6 pt-6">
         <View className="flex-row justify-between items-center mb-8">
           <View>
-            <Text className="text-3xl font-bold text-foreground">Welcome, Sam</Text>
+            <Text className="text-3xl font-bold text-foreground">Welcome, {firstName}</Text>
             <Text className="text-muted-foreground mt-1">Carer Portal & Session Prep</Text>
           </View>
           <TouchableOpacity onPress={logout} className="px-4 py-2 bg-surface rounded-full border border-border">
@@ -43,24 +48,19 @@ export default function AutismHomeScreen() {
           </View>
           
           <View className="space-y-4">
-            <View className="flex-row items-start mb-4">
-              <View className="h-6 w-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                <Text className="text-primary text-xs font-bold">1</Text>
+            {iepGoals.map((goal, i) => (
+              <View key={goal} className="flex-row items-start mb-4">
+                <View className="h-6 w-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
+                  <Text className="text-primary text-xs font-bold">{i + 1}</Text>
+                </View>
+                <View className="flex-1">
+                  <Text className="text-foreground font-medium">{goal}</Text>
+                  <Text className="text-muted-foreground text-sm mt-1">
+                    Goal progress: {GOAL_PROGRESS[i] ?? 0}%
+                  </Text>
+                </View>
               </View>
-              <View className="flex-1">
-                <Text className="text-foreground font-medium">Identify 2 emotions in a safe scenario</Text>
-                <Text className="text-muted-foreground text-sm mt-1">Goal progress: 40%</Text>
-              </View>
-            </View>
-            <View className="flex-row items-start mb-4">
-              <View className="h-6 w-6 rounded-full bg-primary/20 items-center justify-center mr-3 mt-0.5">
-                <Text className="text-primary text-xs font-bold">2</Text>
-              </View>
-              <View className="flex-1">
-                <Text className="text-foreground font-medium">Practice asking for a break</Text>
-                <Text className="text-muted-foreground text-sm mt-1">Goal progress: 85%</Text>
-              </View>
-            </View>
+            ))}
           </View>
         </View>
 

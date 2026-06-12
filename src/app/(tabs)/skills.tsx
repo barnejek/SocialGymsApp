@@ -3,14 +3,6 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Lock, CheckCircle2, Star } from 'lucide-react-native';
 
-const SKILLS = [
-  { id: 1, name: 'Basic Small Talk', status: 'completed', tier: 1 },
-  { id: 2, name: 'Active Listening', status: 'unlocked', tier: 1 },
-  { id: 3, name: 'Giving Feedback', status: 'locked', tier: 2 },
-  { id: 4, name: 'Salary Negotiation', status: 'locked', tier: 3 },
-  { id: 5, name: 'Conflict De-escalation', status: 'locked', tier: 4 },
-];
-
 export default function SkillsTreeScreen() {
   const renderNode = (name: string, status: 'completed' | 'unlocked' | 'locked', tier: number, isCenter = false) => (
     <TouchableOpacity 

@@ -1,6 +1,6 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Dumbbell, LayoutDashboard, Settings, Network, Award, Clock } from 'lucide-react-native';
+import { Dumbbell, LayoutDashboard, Settings, Award } from 'lucide-react-native';
 import { useAuth } from '../../components/AuthProvider';
 
 export default function TabLayout() {
@@ -74,8 +74,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
-          tabBarIcon: ({ color }) => <Clock color={color} size={24} />,
+          href: null as any // Hidden from tab bar, accessed via the B2C Dashboard "Workouts" card
         }}
       />
     </Tabs>

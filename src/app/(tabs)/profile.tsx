@@ -3,10 +3,12 @@ import { View, Text, ScrollView, TextInput, TouchableOpacity, Switch } from 'rea
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Save } from 'lucide-react-native';
+import { useAuth } from '../../components/AuthProvider';
 
 export default function EditProfileScreen() {
   const router = useRouter();
-  const [name, setName] = useState("Alex");
+  const { user } = useAuth();
+  const [name, setName] = useState(user?.name.split(' ')[0] ?? '');
   const [email, setEmail] = useState("alex@example.com");
   const [isPublic, setIsPublic] = useState(true);
 
