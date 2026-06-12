@@ -1,9 +1,40 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
 :root {
-  --font-display:
-    Spline Sans, Inter, ui-sans-serif, system-ui, sans-serif, Apple Color Emoji, Segoe UI Emoji,
-    Segoe UI Symbol, Noto Color Emoji;
-  --font-mono:
-    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, Courier New, monospace;
-  --font-rounded: 'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif;
-  --font-serif: Georgia, 'Times New Roman', serif;
+  --background: 225 40% 9%;
+  --surface: 225 35% 13%;
+  --surface-2: 225 30% 17%;
+  --foreground: 0 0% 98%;
+  --muted: 225 25% 18%;
+  --muted-foreground: 225 12% 65%;
+
+  --card: 225 35% 13%;
+  --card-foreground: 0 0% 98%;
+
+  --popover: 225 35% 13%;
+  --popover-foreground: 0 0% 98%;
+
+  --primary: 30 92% 61%;
+  --primary-foreground: 225 40% 9%;
+
+  --secondary: 225 30% 17%;
+  --secondary-foreground: 0 0% 98%;
+
+  --accent: 30 92% 61%;
+  --accent-foreground: 225 40% 9%;
+
+  --destructive: 0 70% 55%;
+  --destructive-foreground: 0 0% 98%;
+
+  --border: 225 25% 20%;
+  --input: 225 25% 18%;
+  --ring: 30 92% 61%;
+
+  --engagement: 142 55% 52%;
+  --comfort: 30 92% 61%;
+  --openness: 207 89% 61%;
+
+  --radius: 0.75rem;
 }
