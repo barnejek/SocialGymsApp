@@ -65,12 +65,12 @@ export const PHASE_LABEL: Record<TrinityPhase, string> = {
 
 /** One-line hint shown under the transcript per phase. */
 export const PHASE_HINT: Record<TrinityPhase, string> = {
-  "phase-1-setup": "Your coach is setting the scene. When they finish, just start talking.",
-  "phase-2-convo-1": "You're in character. Talk naturally — no feedback yet, the clock is running.",
-  "phase-3-feedback-1": "Coach is breaking down what you just did. Just listen.",
-  "phase-4-reversal": "Roles swapped — the coach plays you to show one way. You play the other person.",
-  "phase-5-convo-2": "Back to the original roles. Run it again and apply what you saw.",
-  "phase-6-final": "Final debrief — your before-and-after and your Golden Rule.",
+  "phase-1-setup": "Your coach is setting the scene and today's one sub-skill. When they finish, just start talking.",
+  "phase-2-convo-1": "You're in character (behavioral rehearsal — practice under real conditions). No feedback yet, the clock is running.",
+  "phase-3-feedback-1": "Coach is breaking down what you just did (performance feedback — the most effective ingredient in social-skills training).",
+  "phase-4-reversal": "Roles swapped — the coach plays you to show one way (modeling). You play the other person.",
+  "phase-5-convo-2": "Back to the original roles (re-rehearsal — where the improvement locks in). Apply what you saw.",
+  "phase-6-final": "Final debrief — your before-and-after, one piece of homework, and your Golden Rule.",
   scoring: "Scoring your session…",
 };
 
