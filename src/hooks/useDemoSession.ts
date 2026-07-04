@@ -183,8 +183,22 @@ export function useDemoSession() {
         });
       };
 
+      // Idempotency guard: an entry can be "finished" by several racing
+      // signals (Speech onDone, the rendered-audio listener, the safety-net
+      // fallback timer, or the muted path). Without this guard, both onDone
+      // AND the fallback fire finishEntry -> scheduleNext runs twice -> two
+      // parallel streamEntry chains, each of which doubles again, so the same
+      // lines get re-appended and re-spoken indefinitely. Advance EXACTLY once.
+      let entrySettled = false;
+      let entryFallbackId: ReturnType<typeof setTimeout> | null = null;
+
       const finishEntry = () => {
-        if (cancelledRef.current) return;
+        if (entrySettled || cancelledRef.current) return;
+        entrySettled = true;
+        if (entryFallbackId) {
+          clearTimeout(entryFallbackId);
+          entryFallbackId = null;
+        }
         setIsPlaying(false);
         scheduleNext(index, entry.delayAfterMs ?? 1200);
       };
@@ -231,8 +245,9 @@ export function useDemoSession() {
           onDone: finishEntry,
           onError: finishEntry,
         });
-        const fallback = setTimeout(finishEntry, durationMs + 8000);
-        timeoutsRef.current.push(fallback);
+        // Safety net only — cancelled by finishEntry when onDone fires first.
+        entryFallbackId = setTimeout(finishEntry, durationMs + 8000);
+        timeoutsRef.current.push(entryFallbackId);
       };
 
       const playWithRenderedAudio = async () => {
