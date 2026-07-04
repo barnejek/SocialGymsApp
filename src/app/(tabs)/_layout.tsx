@@ -1,11 +1,11 @@
 import React from 'react';
 import { Tabs } from 'expo-router';
-import { Dumbbell, LayoutDashboard, Settings, Award } from 'lucide-react-native';
+import { Dumbbell, LayoutDashboard, Settings, Award, FlaskConical } from 'lucide-react-native';
 import { useAuth } from '../../components/AuthProvider';
 
 export default function TabLayout() {
   const { user } = useAuth();
-  
+
   // Conditionally hide tabs based on persona
   const isEducator = user?.persona === 'b2b_educator';
 
@@ -31,6 +31,14 @@ export default function TabLayout() {
           title: 'Home',
           tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={24} />,
           href: (user?.persona === 'b2c_user' ? '/(tabs)/dashboard' : null) as any
+        }}
+      />
+      <Tabs.Screen
+        name="science"
+        options={{
+          title: 'Science',
+          tabBarIcon: ({ color }) => <FlaskConical color={color} size={24} />,
+          href: (user?.persona === 'b2c_user' ? '/(tabs)/science' : null) as any
         }}
       />
       <Tabs.Screen

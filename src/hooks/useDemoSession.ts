@@ -34,9 +34,17 @@ const BASE_PROFILES: Record<DemoSpeaker, VoiceProfile> = {
   you: STUDENT_VOICE,
 };
 
-const MS_PER_WORD_AT_RATE_1 = 140;
-const MIN_MS_PER_WORD = 60;
-const MAX_MS_PER_WORD = 300;
+// Pacing for the word-by-word transcript reveal.
+// This must track the REAL device TTS speed, otherwise the text races ahead of
+// the voice and the coach looks robotic / lip-synced-wrong. On-device neural
+// voices speak far slower than the old 140ms/word estimate, so the transcript
+// was finishing well before the audio. Calibrated up, and biased so the text
+// trails the voice by REVEAL_LAG_MS (a hair behind reads natural; ahead does not).
+const MS_PER_WORD_AT_RATE_1 = 300;
+const MIN_MS_PER_WORD = 90;
+const MAX_MS_PER_WORD = 500;
+// Let the voice start before the first word paints, so text follows speech.
+const REVEAL_LAG_MS = 260;
 
 export function useDemoSession() {
   const [status, setStatus] = useState<{ value: GeminiLiveStatus }>({ value: 'disconnected' });
@@ -204,25 +212,40 @@ export function useDemoSession() {
       };
 
       const startWordReveal = (durationMs: number) => {
-        let wordIdx = 0;
+        // Pace the words across the speech window, minus a short lead so the
+        // voice is already talking before text appears (text trails, not leads).
+        const revealWindow = Math.max(
+          MIN_MS_PER_WORD * words.length,
+          durationMs - REVEAL_LAG_MS,
+        );
         const msPerWord = clamp(
-          Math.round(durationMs / Math.max(1, words.length)),
+          Math.round(revealWindow / Math.max(1, words.length)),
           MIN_MS_PER_WORD,
           MAX_MS_PER_WORD,
         );
-        const revealId = setInterval(() => {
-          if (cancelledRef.current) {
-            clearInterval(revealId);
-            return;
-          }
-          const w = words[wordIdx];
-          if (w !== undefined) {
-            appendWord(w);
-            wordIdx++;
-          }
-          if (wordIdx >= words.length) clearInterval(revealId);
-        }, msPerWord);
-        intervalsRef.current.push(revealId);
+        const beginReveal = () => {
+          if (cancelledRef.current) return;
+          let wordIdx = 0;
+          const revealId = setInterval(() => {
+            if (cancelledRef.current) {
+              clearInterval(revealId);
+              return;
+            }
+            const w = words[wordIdx];
+            if (w !== undefined) {
+              appendWord(w);
+              wordIdx++;
+            }
+            if (wordIdx >= words.length) clearInterval(revealId);
+          }, msPerWord);
+          intervalsRef.current.push(revealId);
+        };
+        if (REVEAL_LAG_MS > 0) {
+          const lead = setTimeout(beginReveal, REVEAL_LAG_MS);
+          timeoutsRef.current.push(lead);
+        } else {
+          beginReveal();
+        }
       };
 
       const estimatedSpeechMs = (rate: number) =>

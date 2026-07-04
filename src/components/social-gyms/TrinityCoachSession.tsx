@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { Image } from 'expo-image';
-import { Mic, MicOff, PhoneOff, ArrowRight } from 'lucide-react-native';
+import { Mic, MicOff, PhoneOff, ArrowRight, CheckCircle2 } from 'lucide-react-native';
 import { EmotionPanel } from './EmotionPanel';
 import type { SessionResult } from './Results';
 import { useFaceCapture } from '../../hooks/useFaceCapture';
@@ -226,60 +226,73 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
         </View>
       </View>
 
-      {/* Conversation (shrinks when complete so footer CTA stays tappable) */}
-      <View
-        className="rounded-2xl border border-border bg-surface overflow-hidden mb-3"
-        style={{ flex: isComplete ? 0 : 1, flexShrink: 1, minHeight: isComplete ? undefined : 0, maxHeight: isComplete ? 220 : undefined }}
-      >
-        <ScrollView ref={scrollRef} className="flex-1 px-4 py-4" onContentSizeChange={scrollToEnd}>
-          {gemini.messages.map((m, i) => {
-            const speaker = (m as any).speaker ?? (m.type === 'user_message' ? 'you' : 'coach');
-            // ONE rule, no exceptions: whoever is TALKING decides the side.
-            // The coach talking (coach / partner / self) is always on the LEFT.
-            // The user talking ("you") is always on the RIGHT in orange --
-            // whichever character they happen to be voicing that phase.
-            const isMine = speaker === 'you';
-            const meta = SPEAKER_META[speaker] ?? SPEAKER_META.coach;
-            const label = (m as any).name ?? meta.name;
-            return (
-              <View key={i} className={`mb-3 ${isMine ? 'items-end' : 'items-start'}`}>
-                <Text className="text-[10px] font-semibold mb-1 px-1" style={{ color: meta.color }}>{label}</Text>
-                <View className={`rounded-2xl px-4 py-2.5 max-w-[85%] ${
-                  isMine ? 'bg-primary rounded-br-sm' : 'bg-surface-2 rounded-bl-sm'
-                }`}>
-                  <Text className={`text-sm ${isMine ? 'text-primary-foreground' : 'text-foreground'}`}>
-                    {m.message.content || '...'}
-                  </Text>
-                </View>
-              </View>
-            );
-          })}
-        </ScrollView>
-        <View className="border-t border-border bg-surface-2 px-4 py-2.5">
-          <Text className="text-[11px] text-muted-foreground" numberOfLines={2}>{PHASE_HINT[phase]}</Text>
-        </View>
-      </View>
-
-      {/* Camera + live metrics + results CTA — pinned footer above tab bar */}
-      <View className="mb-2" style={{ zIndex: 10, elevation: 10 }}>
-        <EmotionPanel
-          active={active}
-          cameraGranted={cameraGranted}
-          metrics={fused}
-          evi={gemini.status.value}
-        />
-
-        {isComplete && (
+      {isComplete ? (
+        /* Session finished: drop the transcript + camera entirely and show a
+           clean, full-height completion state with the results CTA. */
+        <View className="flex-1 items-center justify-center px-6 pb-6">
+          <View className="h-20 w-20 rounded-full items-center justify-center bg-engagement/15 mb-6">
+            <CheckCircle2 size={44} color="#22c55e" />
+          </View>
+          <Text className="text-2xl font-bold text-foreground text-center">Session complete</Text>
+          <Text className="text-sm text-muted-foreground text-center mt-2 mb-8 max-w-[300px] leading-relaxed">
+            Nice work — you ran the full six-phase circuit. Here's how you did.
+          </Text>
           <TouchableOpacity
             accessibilityLabel="See results"
             onPress={() => onComplete(buildResult())}
-            className="flex-row items-center justify-center bg-primary rounded-full py-3.5 mt-2"
+            className="flex-row items-center justify-center bg-primary rounded-full py-4 w-full"
           >
-            <Text className="text-primary-foreground font-bold mr-2">See your results</Text>
+            <Text className="text-primary-foreground font-bold text-base mr-2">See your results</Text>
             <ArrowRight size={18} color="#0e1424" />
           </TouchableOpacity>
-        )}
-      </View>
+        </View>
+      ) : (
+        <>
+          {/* Conversation */}
+          <View
+            className="rounded-2xl border border-border bg-surface overflow-hidden mb-3"
+            style={{ flex: 1, flexShrink: 1, minHeight: 0 }}
+          >
+            <ScrollView ref={scrollRef} className="flex-1 px-4 py-4" onContentSizeChange={scrollToEnd}>
+              {gemini.messages.map((m, i) => {
+                const speaker = (m as any).speaker ?? (m.type === 'user_message' ? 'you' : 'coach');
+                // ONE rule, no exceptions: whoever is TALKING decides the side.
+                // The coach talking (coach / partner / self) is always on the LEFT.
+                // The user talking ("you") is always on the RIGHT in orange --
+                // whichever character they happen to be voicing that phase.
+                const isMine = speaker === 'you';
+                const meta = SPEAKER_META[speaker] ?? SPEAKER_META.coach;
+                const label = (m as any).name ?? meta.name;
+                return (
+                  <View key={i} className={`mb-3 ${isMine ? 'items-end' : 'items-start'}`}>
+                    <Text className="text-[10px] font-semibold mb-1 px-1" style={{ color: meta.color }}>{label}</Text>
+                    <View className={`rounded-2xl px-4 py-2.5 max-w-[85%] ${
+                      isMine ? 'bg-primary rounded-br-sm' : 'bg-surface-2 rounded-bl-sm'
+                    }`}>
+                      <Text className={`text-sm ${isMine ? 'text-primary-foreground' : 'text-foreground'}`}>
+                        {m.message.content || '...'}
+                      </Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </ScrollView>
+            <View className="border-t border-border bg-surface-2 px-4 py-2.5">
+              <Text className="text-[11px] text-muted-foreground" numberOfLines={2}>{PHASE_HINT[phase]}</Text>
+            </View>
+          </View>
+
+          {/* Camera + live metrics — pinned footer above tab bar */}
+          <View className="mb-2" style={{ zIndex: 10, elevation: 10 }}>
+            <EmotionPanel
+              active={active}
+              cameraGranted={cameraGranted}
+              metrics={fused}
+              evi={gemini.status.value}
+            />
+          </View>
+        </>
+      )}
     </View>
   );
 };
