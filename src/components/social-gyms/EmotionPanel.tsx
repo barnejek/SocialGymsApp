@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { FaceTrackerBridge } from '../FaceTrackerBridge';
 import { useAuth } from '../../components/AuthProvider';
@@ -75,9 +75,16 @@ const LivePulse = ({ active }: { active: boolean }) => {
 
 export const EmotionPanel = ({ active, metrics }: EmotionPanelProps) => {
   const { user } = useAuth();
-  const [permission, requestPermission] = useCameraPermissions();
+  // Permission is resolved on the pre-session screen (see train.tsx). We only
+  // read it here — never prompt mid-session, so a recorded take never shows a
+  // tap-to-enable gate. If it's somehow not granted, fall back to the inert
+  // "Camera inactive" placeholder below.
+  const [permission] = useCameraPermissions();
 
   const runFaceBridge = !DEMO_MODE;
+
+  // Only show the live feed when the session is active AND permission is granted.
+  const showCamera = active && !!permission?.granted;
 
   const rows: { label: string; key: MetricKey; value: number }[] = [
     { label: 'Engagement', key: 'engagement', value: metrics.engagement },
@@ -87,30 +94,11 @@ export const EmotionPanel = ({ active, metrics }: EmotionPanelProps) => {
     { label: 'Smiling', key: 'smiling', value: metrics.smiling },
   ];
 
-  if (!permission) {
-    return <View className="flex-1" />;
-  }
-
-  if (!permission.granted) {
-    return (
-      <View className="flex-1 items-center justify-center bg-surface rounded-2xl border border-border p-6">
-        <Text className="text-foreground text-center mb-4">We need your permission to show the camera</Text>
-        <TouchableOpacity
-          accessibilityLabel="Enable camera"
-          onPress={requestPermission}
-          className="rounded-full bg-primary px-5 py-2.5"
-        >
-          <Text className="text-primary-foreground text-sm font-semibold">Enable camera</Text>
-        </TouchableOpacity>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-row gap-3">
       {/* Square, mirrored camera self-view on the left */}
       <View className="w-36 aspect-square rounded-2xl overflow-hidden border border-border bg-black relative">
-        {active ? (
+        {showCamera ? (
           <>
             <CameraView style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]} facing="front" />
             {runFaceBridge && <FaceTrackerBridge enabled={active} onMetrics={(_m: any) => {}} />}
