@@ -1,5 +1,29 @@
 {
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cd /c/Users/barto/social-gyms-practice/mobile && npx tsc --noEmit --skipLibCheck 2>&1 | tail -20"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const p=process.env.TOOL_INPUT_FILE_PATH||''; if(p.includes('mockBackend')||p.endsWith('.env')){console.error('BLOCKED: mockBackend.ts and .env are protected. Confirm intent before editing.'); process.exit(1);}\""
+          }
+        ]
+      }
+    ]
   }
 }

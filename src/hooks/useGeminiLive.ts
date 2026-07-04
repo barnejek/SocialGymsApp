@@ -6,6 +6,13 @@ export type GeminiLiveStatus = "disconnected" | "connecting" | "connected";
 export interface GeminiMessage {
   type: "user_message" | "assistant_message";
   message: { role: string; content: string };
+  // Optional speaker tag (coach / partner / self / you) so the transcript can
+  // label who is talking. Set by the demo session; the live engine may leave it
+  // undefined.
+  speaker?: "coach" | "partner" | "self" | "you";
+  // Optional per-line label override (e.g. "You · as Jordan" in the reversal).
+  // Falls back to the speaker's default name when undefined.
+  name?: string;
 }
 
 const WS_BASE =

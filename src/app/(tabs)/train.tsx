@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, BackHandler, TouchableOpacity, Text } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
+import { useNavigation } from 'expo-router';
 import { useAuth } from '../../components/AuthProvider';
 import { recordSessionComplete } from '../../lib/gamification';
 import { ScenarioPicker } from '../../components/social-gyms/ScenarioPicker';
@@ -14,13 +15,32 @@ import { TrinityCoachSession } from '../../components/social-gyms/TrinityCoachSe
 
 type Stage = "setup" | "session" | "results";
 
+const TAB_BAR_STYLE = {
+  backgroundColor: '#0f172a',
+  borderTopColor: '#1e293b',
+} as const;
+
 export default function Index() {
   const [stage, setStage] = useState<Stage>("setup");
   const [topicId, setTopicId] = useState<TopicId | null>(null);
   const [lessonLength, setLessonLength] = useState<LessonLength>(DEFAULT_LESSON_LENGTH);
   const [result, setResult] = useState<SessionResult | null>(null);
   const { user, logout } = useAuth();
+  const navigation = useNavigation();
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
+  const cameraGranted = cameraPermission?.granted === true;
+
+  // Hide the tab bar during session/results so the footer CTA isn't blocked.
+  useEffect(() => {
+    const tabNav = navigation.getParent();
+    if (!tabNav) return;
+    tabNav.setOptions({
+      tabBarStyle: stage === 'setup' ? TAB_BAR_STYLE : { display: 'none' },
+    });
+    return () => {
+      tabNav.setOptions({ tabBarStyle: TAB_BAR_STYLE });
+    };
+  }, [stage, navigation]);
 
   // Resolve camera permission up front, on the pre-session setup screen, so
   // that by the time TrinityCoachSession / EmotionPanel mounts the permission
@@ -101,6 +121,7 @@ export default function Index() {
             topic={topics.find((t) => t.id === topicId)!}
             lessonLength={lessonLength}
             active={stage === "session"}
+            cameraGranted={cameraGranted}
             onComplete={(r) => {
               recordSessionComplete(Math.round((r.scoring.attempt2.engagement + r.scoring.attempt2.comfort + r.scoring.attempt2.openness) / 3));
               setResult(r);

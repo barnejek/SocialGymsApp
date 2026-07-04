@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
-import { CameraView, useCameraPermissions } from 'expo-camera';
+import { CameraView } from 'expo-camera';
 import { FaceTrackerBridge } from '../FaceTrackerBridge';
 import { useAuth } from '../../components/AuthProvider';
 import type { EmotionMetrics } from '../../lib/emotion';
@@ -8,6 +8,8 @@ import { DEMO_MODE } from '../../lib/utils';
 
 interface EmotionPanelProps {
   active: boolean;
+  /** Lifted from train.tsx so permission state is single-sourced. */
+  cameraGranted: boolean;
   metrics: EmotionMetrics;
   evi: string;
 }
@@ -73,18 +75,12 @@ const LivePulse = ({ active }: { active: boolean }) => {
   );
 };
 
-export const EmotionPanel = ({ active, metrics }: EmotionPanelProps) => {
+export const EmotionPanel = ({ active, cameraGranted, metrics }: EmotionPanelProps) => {
   const { user } = useAuth();
-  // Permission is resolved on the pre-session screen (see train.tsx). We only
-  // read it here — never prompt mid-session, so a recorded take never shows a
-  // tap-to-enable gate. If it's somehow not granted, fall back to the inert
-  // "Camera inactive" placeholder below.
-  const [permission] = useCameraPermissions();
 
   const runFaceBridge = !DEMO_MODE;
 
-  // Only show the live feed when the session is active AND permission is granted.
-  const showCamera = active && !!permission?.granted;
+  const showCamera = active && cameraGranted;
 
   const rows: { label: string; key: MetricKey; value: number }[] = [
     { label: 'Engagement', key: 'engagement', value: metrics.engagement },

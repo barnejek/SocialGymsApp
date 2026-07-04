@@ -33,6 +33,7 @@ interface Props {
   topic: Topic;
   lessonLength: LessonLength;
   active: boolean;
+  cameraGranted: boolean;
   onComplete: (r: SessionResult) => void;
 }
 
@@ -46,7 +47,7 @@ const SPEAKER_META: Record<string, { name: string; color: string }> = {
   you: { name: 'You', color: '#F5A340' },
 };
 
-export const TrinityCoachSession = ({ topic, lessonLength, active, onComplete }: Props) => {
+export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted, onComplete }: Props) => {
   const { user } = useAuth();
 
   const geminiLive = useGeminiLive(GEMINI_API_KEY);
@@ -225,8 +226,11 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, onComplete }:
         </View>
       </View>
 
-      {/* Conversation (fixed-size, internally scrollable) */}
-      <View className="flex-1 rounded-2xl border border-border bg-surface overflow-hidden mb-3">
+      {/* Conversation (shrinks when complete so footer CTA stays tappable) */}
+      <View
+        className="rounded-2xl border border-border bg-surface overflow-hidden mb-3"
+        style={{ flex: isComplete ? 0 : 1, flexShrink: 1, minHeight: isComplete ? undefined : 0, maxHeight: isComplete ? 220 : undefined }}
+      >
         <ScrollView ref={scrollRef} className="flex-1 px-4 py-4" onContentSizeChange={scrollToEnd}>
           {gemini.messages.map((m, i) => {
             const speaker = (m as any).speaker ?? (m.type === 'user_message' ? 'you' : 'coach');
@@ -256,26 +260,26 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, onComplete }:
         </View>
       </View>
 
-      {/* Camera + live metrics (fixed) */}
-      <View className="mb-2">
+      {/* Camera + live metrics + results CTA — pinned footer above tab bar */}
+      <View className="mb-2" style={{ zIndex: 10, elevation: 10 }}>
         <EmotionPanel
           active={active}
+          cameraGranted={cameraGranted}
           metrics={fused}
           evi={gemini.status.value}
         />
-      </View>
 
-      {/* Results CTA (appears when the session finishes) */}
-      {isComplete && (
-        <TouchableOpacity
-          accessibilityLabel="See results"
-          onPress={() => onComplete(buildResult())}
-          className="flex-row items-center justify-center bg-primary rounded-full py-3.5 mb-2"
-        >
-          <Text className="text-primary-foreground font-bold mr-2">See your results</Text>
-          <ArrowRight size={18} color="#0e1424" />
-        </TouchableOpacity>
-      )}
+        {isComplete && (
+          <TouchableOpacity
+            accessibilityLabel="See results"
+            onPress={() => onComplete(buildResult())}
+            className="flex-row items-center justify-center bg-primary rounded-full py-3.5 mt-2"
+          >
+            <Text className="text-primary-foreground font-bold mr-2">See your results</Text>
+            <ArrowRight size={18} color="#0e1424" />
+          </TouchableOpacity>
+        )}
+      </View>
     </View>
   );
 };
