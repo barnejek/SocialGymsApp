@@ -8,7 +8,11 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "Social Gyms needs the microphone so your coach can hear you during a live training session.",
+        "NSCameraUsageDescription": "Social Gyms uses the front camera to read your facial expressions and show real-time presence feedback during a coaching session."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -17,6 +21,10 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ],
       "predictiveBackGestureEnabled": false,
       "package": "com.barnejek.mobile"
     },
@@ -37,10 +45,12 @@
         }
       ],
       "expo-audio",
+      "react-native-audio-api",
       [
         "expo-camera",
         {
           "cameraPermission": "Social Gyms uses the front camera to read your facial expressions and show real-time presence feedback during a coaching session.",
+          "microphonePermission": "Social Gyms needs the microphone so your coach can hear you during a live training session.",
           "recordAudioAndroid": false
         }
       ]

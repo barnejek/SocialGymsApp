@@ -1,17 +1,29 @@
 import { useEffect, useRef } from "react";
+import type { RefObject } from "react";
 import type { EmotionMetrics } from "@/lib/emotion";
 import type { CameraView } from "expo-camera";
+import type { FaceTrackerBridgeHandle } from "../components/FaceTrackerBridge";
 
 interface Options {
-  cameraRef: React.RefObject<CameraView>;
-  bridgeRef: React.RefObject<any>; // WebView ref
+  cameraRef: RefObject<CameraView | null>;
+  bridgeRef: RefObject<FaceTrackerBridgeHandle | null>;
   gated: boolean;
   enabled: boolean;
+  /** Set true from CameraView.onCameraReady — refs aren't reactive, so this re-arms capture. */
+  cameraReady: boolean;
   intervalMs?: number;
   onMetrics: (m: EmotionMetrics) => void;
 }
 
-export function useFaceCapture({ cameraRef, bridgeRef, gated, enabled, intervalMs = 3000, onMetrics }: Options) {
+export function useFaceCapture({
+  cameraRef,
+  bridgeRef,
+  gated,
+  enabled,
+  cameraReady,
+  intervalMs = 3000,
+  onMetrics,
+}: Options) {
   const inFlight = useRef(false);
 
   const onMetricsRef = useRef(onMetrics);
@@ -21,29 +33,28 @@ export function useFaceCapture({ cameraRef, bridgeRef, gated, enabled, intervalM
   useEffect(() => { gatedRef.current = gated; }, [gated]);
 
   useEffect(() => {
-    if (!enabled || !cameraRef.current || !bridgeRef.current) return;
+    if (!enabled || !cameraReady) return;
+    if (!cameraRef.current || !bridgeRef.current) return;
 
     let cancelled = false;
 
     const tick = async () => {
       if (!gatedRef.current || inFlight.current) return;
-      
+
       inFlight.current = true;
       try {
         if (cancelled) return;
-        
-        // Take a low-res snapshot from expo-camera
+
         const photo = await cameraRef.current?.takePictureAsync({
           quality: 0.1,
           base64: true,
-          scale: 0.2, // shrink image for faster processing
+          scale: 0.2,
         });
 
         if (photo?.base64 && bridgeRef.current) {
-          // Send base64 to WebView bridge
           bridgeRef.current.postMessage(`data:image/jpeg;base64,${photo.base64}`);
         }
-      } catch (e) {
+      } catch {
         // Silent fail for camera frame drops
       } finally {
         inFlight.current = false;
@@ -51,9 +62,10 @@ export function useFaceCapture({ cameraRef, bridgeRef, gated, enabled, intervalM
     };
 
     const id = setInterval(tick, intervalMs);
+    void tick();
     return () => {
       cancelled = true;
       clearInterval(id);
     };
-  }, [enabled, cameraRef, bridgeRef, intervalMs]);
+  }, [enabled, cameraReady, cameraRef, bridgeRef, intervalMs]);
 }

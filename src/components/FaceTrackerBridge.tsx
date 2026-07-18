@@ -1,7 +1,11 @@
-import React, { useRef, useState, useEffect } from 'react';
+import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react';
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { EmotionMetrics } from '../lib/emotion';
+
+export interface FaceTrackerBridgeHandle {
+  postMessage: (data: string) => void;
+}
 
 interface FaceTrackerBridgeProps {
   onMetrics: (metrics: EmotionMetrics) => void;
@@ -48,66 +52,76 @@ const faceApiHtml = `
       };
     }
 
-    document.addEventListener("message", async (event) => {
+    async function onFrame(data) {
       if (!modelsReady) return;
-      const data = event.data;
-      if (data.startsWith('data:image')) {
-        const img = document.getElementById('image');
-        img.src = data;
-        img.onload = async () => {
-          const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
-          if (det) {
-            const metrics = expressionsToMetrics(det.expressions);
-            window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'metrics', data: metrics }));
-          }
-        };
-      }
-    });
+      if (typeof data !== 'string' || !data.startsWith('data:image')) return;
+      const img = document.getElementById('image');
+      img.src = data;
+      img.onload = async () => {
+        const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+        if (det) {
+          const metrics = expressionsToMetrics(det.expressions);
+          window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'metrics', data: metrics }));
+        }
+      };
+    }
+
+    // Android RN WebView
+    document.addEventListener('message', (event) => { onFrame(event.data); });
+    // iOS RN WebView
+    window.addEventListener('message', (event) => { onFrame(event.data); });
   </script>
 </body>
 </html>
 `;
 
-export function FaceTrackerBridge({ onMetrics, enabled }: FaceTrackerBridgeProps) {
-  const webViewRef = useRef<WebView>(null);
-  const [isReady, setIsReady] = useState(false);
+export const FaceTrackerBridge = forwardRef<FaceTrackerBridgeHandle, FaceTrackerBridgeProps>(
+  function FaceTrackerBridge({ onMetrics, enabled }, ref) {
+    const webViewRef = useRef<WebView>(null);
+    const [isReady, setIsReady] = useState(false);
 
-  // We expose a ref to send base64 images from the camera to the WebView
-  useEffect(() => {
-    // In actual implementation, you will use expo-camera to take snapshots (e.g. at 3fps) 
-    // and pass the base64 string to this WebView using:
-    // webViewRef.current?.postMessage('data:image/jpeg;base64,' + base64String);
-  }, []);
+    useImperativeHandle(ref, () => ({
+      postMessage: (data: string) => {
+        if (!isReady) return;
+        webViewRef.current?.postMessage(data);
+      },
+    }), [isReady]);
 
-  if (!enabled) return null;
+    if (!enabled) return null;
 
-  return (
-    <View style={styles.container}>
-      <WebView
-        ref={webViewRef}
-        source={{ html: faceApiHtml }}
-        javaScriptEnabled={true}
-        onMessage={(event) => {
-          const msg = JSON.parse(event.nativeEvent.data);
-          if (msg.type === 'ready') setIsReady(true);
-          if (msg.type === 'metrics' && onMetrics) {
-            onMetrics(msg.data);
-          }
-        }}
-        style={styles.webview}
-      />
-    </View>
-  );
-}
+    return (
+      <View style={styles.container}>
+        <WebView
+          ref={webViewRef}
+          source={{ html: faceApiHtml }}
+          javaScriptEnabled
+          originWhitelist={['*']}
+          onMessage={(event) => {
+            try {
+              const msg = JSON.parse(event.nativeEvent.data);
+              if (msg.type === 'ready') setIsReady(true);
+              if (msg.type === 'metrics' && onMetrics) {
+                onMetrics(msg.data);
+              }
+            } catch {
+              // ignore malformed bridge messages
+            }
+          }}
+          style={styles.webview}
+        />
+      </View>
+    );
+  },
+);
 
 const styles = StyleSheet.create({
   container: {
     width: 0,
     height: 0,
-    opacity: 0, // completely hidden
+    opacity: 0,
   },
   webview: {
     width: 0,
     height: 0,
-  }
+  },
 });

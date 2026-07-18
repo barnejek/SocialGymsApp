@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScrollView, View, BackHandler, TouchableOpacity, Text } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
+import { requestRecordingPermissionsAsync } from 'expo-audio';
 import { useNavigation } from 'expo-router';
 import { useAuth } from '../../components/AuthProvider';
 import { recordSessionComplete } from '../../lib/gamification';
@@ -42,16 +43,15 @@ export default function Index() {
     };
   }, [stage, navigation]);
 
-  // Resolve camera permission up front, on the pre-session setup screen, so
-  // that by the time TrinityCoachSession / EmotionPanel mounts the permission
-  // is already granted and the live feed shows immediately with no gate screen
-  // mid-take. This is a general fix (all personas), not demo-only.
+  // Resolve camera + mic permissions up front on the pre-session setup screen
+  // so TrinityCoachSession / EmotionPanel mount already granted.
   useEffect(() => {
     if (stage !== 'setup') return;
     if (!cameraPermission) return; // still loading — resolves quickly
     if (!cameraPermission.granted && cameraPermission.canAskAgain) {
       void requestCameraPermission();
     }
+    void requestRecordingPermissionsAsync();
   }, [stage, cameraPermission, requestCameraPermission]);
 
   const handleContinue = () => {

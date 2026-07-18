@@ -2,18 +2,31 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { Image } from 'expo-image';
 import { Mic, MicOff, PhoneOff, ArrowRight, CheckCircle2 } from 'lucide-react-native';
+import type { CameraView } from 'expo-camera';
 import { EmotionPanel } from './EmotionPanel';
 import type { SessionResult } from './Results';
+import type { FaceTrackerBridgeHandle } from '../FaceTrackerBridge';
 import { useFaceCapture } from '../../hooks/useFaceCapture';
 import { useGeminiLive } from '../../hooks/useGeminiLive';
-import { useDemoSession } from '../../hooks/useDemoSession';
 import { useSessionTimer } from '../../hooks/useSessionTimer';
 import { NEUTRAL_METRICS, type EmotionMetrics } from '../../lib/emotion';
-import { DEMO_MODE } from '../../lib/utils';
-import { DEMO_EMOTION_TIMELINE, DEMO_SCORE_RESULT, DEMO_GOLDEN_RULE } from '../../lib/mockBackend';
-import { trinityPrompt } from '../../lib/trinity';
+import { scoreConversation, type ChatMessage, type ScoreResult } from '../../lib/chat';
+import { trinityPrompt, type PhaseContext } from '../../lib/trinity';
 import { useAuth } from '../../components/AuthProvider';
 import { injectAutismGuardrails } from '../../lib/autism-guardrails';
+import {
+  FINAL_DEBRIEF_CAP_MS,
+  KICKOFF_FEEDBACK,
+  KICKOFF_FINAL,
+  KICKOFF_REVERSAL,
+  KICKOFF_WRAP_EARLY,
+  advanceOnCap,
+  advanceOnTimerEnd,
+  advanceOnTranscript,
+  detectGoldenRule,
+  extractGoldenRule,
+  untimedPhaseCapMs,
+} from '../../lib/phaseMachine';
 import {
   PHASE_LABEL,
   PHASE_HINT,
@@ -29,6 +42,15 @@ import type { Topic } from '../../lib/topics';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? 'dummy-key-for-now';
 
+const FALLBACK_SCORE: ScoreResult = {
+  attempt1: { engagement: 0, comfort: 0, openness: 0 },
+  attempt2: { engagement: 0, comfort: 0, openness: 0 },
+  coachRead: "We couldn't score this session automatically. Your practice still counts — try again when you're back online.",
+  didWell: 'You showed up and ran the full circuit.',
+  tryNext: 'Run another session when scoring is available so you can see the before/after lift.',
+  improvement: 'Scoring was unavailable for this session.',
+};
+
 interface Props {
   topic: Topic;
   lessonLength: LessonLength;
@@ -37,9 +59,6 @@ interface Props {
   onComplete: (r: SessionResult) => void;
 }
 
-// How each speaker is labelled and tinted in the transcript.
-// Coach side (left, voice A): coach / partner / self -> never orange.
-// User side (right, voice B): you -> always orange.
 const SPEAKER_META: Record<string, { name: string; color: string }> = {
   coach: { name: 'Coach', color: '#cbd5e1' },
   partner: { name: 'Jordan', color: '#3B9EF5' },
@@ -49,118 +68,303 @@ const SPEAKER_META: Record<string, { name: string; color: string }> = {
 
 export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted, onComplete }: Props) => {
   const { user } = useAuth();
-
-  const geminiLive = useGeminiLive(GEMINI_API_KEY);
-  const demoSession = useDemoSession();
-  const gemini = DEMO_MODE ? demoSession : geminiLive;
+  const gemini = useGeminiLive(GEMINI_API_KEY);
 
   const [phase, setPhase] = useState<TrinityPhase>('phase-1-setup');
-  const [faceMetrics, setFaceMetrics] = useState<EmotionMetrics | null>(null);
+  const phaseRef = useRef(phase);
+  useEffect(() => { phaseRef.current = phase; }, [phase]);
 
-  const cameraRef = useRef<any>(null);
-  const bridgeRef = useRef<any>(null);
+  const [faceMetrics, setFaceMetrics] = useState<EmotionMetrics | null>(null);
+  const fused = faceMetrics ?? NEUTRAL_METRICS;
+  const fusedRef = useRef(fused);
+  useEffect(() => { fusedRef.current = fused; }, [fused]);
+
+  const [cameraReady, setCameraReady] = useState(false);
+  const [sessionComplete, setSessionComplete] = useState(false);
+  const [pendingResult, setPendingResult] = useState<SessionResult | null>(null);
+
+  const cameraRef = useRef<CameraView | null>(null);
+  const bridgeRef = useRef<FaceTrackerBridgeHandle | null>(null);
   const scrollRef = useRef<ScrollView>(null);
 
-  const fused = faceMetrics ?? NEUTRAL_METRICS;
+  const scenarioRef = useRef('');
+  const attempt1Ref = useRef<ChatMessage[]>([]);
+  const attempt2Ref = useRef<ChatMessage[]>([]);
+  const pendingAdvanceRef = useRef<{ next: TrinityPhase; kickoff?: string } | null>(null);
+  const advanceGuardRef = useRef<Partial<Record<TrinityPhase, boolean>>>({});
+
+  const topicRef = useRef(topic);
+  useEffect(() => { topicRef.current = topic; }, [topic]);
+  const faceMetricsRef = useRef(faceMetrics);
+  useEffect(() => { faceMetricsRef.current = faceMetrics; }, [faceMetrics]);
 
   useFaceCapture({
     cameraRef,
     bridgeRef,
     gated: true,
-    enabled: active && !DEMO_MODE,
+    enabled: active,
+    cameraReady,
     intervalMs: 3000,
     onMetrics: setFaceMetrics,
   });
 
-  // Demo: the progress bar / phase label follow the SCRIPT, not a wall clock.
-  useEffect(() => {
-    if (DEMO_MODE) setPhase(demoSession.currentPhase);
-  }, [demoSession.currentPhase]);
+  const buildCtx = useCallback((): PhaseContext => {
+    const f = fusedRef.current;
+    return {
+      topic: topicRef.current,
+      scenarioFromCoach: scenarioRef.current,
+      emotion: {
+        confidence: f.confidence,
+        anxiety: f.anxiety,
+        engagement: f.engagement,
+        smiling: f.smiling,
+        faceTop: faceMetricsRef.current?.primaryEmotion,
+        voiceTop: undefined,
+      },
+    };
+  }, []);
 
-  // Demo: animate emotion gauges from the scripted keyframe timeline.
-  useEffect(() => {
-    if (!DEMO_MODE || !active) return;
-    const startMs = Date.now();
-    const lerp = (a: number, b: number, t: number) => Math.round(a + (b - a) * t);
-    const kf = DEMO_EMOTION_TIMELINE;
-    const id = setInterval(() => {
-      const elapsed = Date.now() - startMs;
-      let lo = kf[0];
-      let hi = kf[kf.length - 1];
-      for (let i = 0; i < kf.length - 1; i++) {
-        if (elapsed >= kf[i].timeMs && elapsed <= kf[i + 1].timeMs) {
-          lo = kf[i];
-          hi = kf[i + 1];
-          break;
-        }
+  const withGuardrails = useCallback(
+    (prompt: string) => (user ? injectAutismGuardrails(prompt, user) : prompt),
+    [user],
+  );
+
+  const geminiRef = useRef(gemini);
+  useEffect(() => { geminiRef.current = gemini; }, [gemini]);
+
+  const advanceTo = useCallback(
+    async (next: TrinityPhase, kickoffText?: string) => {
+      setPhase(next);
+      if (next === 'scoring') return;
+
+      const systemPrompt = withGuardrails(trinityPrompt(next, buildCtx()));
+      await geminiRef.current.updateSystemPrompt(systemPrompt);
+
+      const t1 = () =>
+        attempt1Ref.current.map((m) => `${m.role === 'user' ? 'Me' : 'Coach'}: ${m.content}`).join('\n');
+      const t2 = () =>
+        attempt2Ref.current.map((m) => `${m.role === 'user' ? 'Me' : 'Coach'}: ${m.content}`).join('\n');
+
+      if (next === 'phase-3-feedback-1') {
+        geminiRef.current.sendText(
+          `My first attempt transcript:\n${t1() || '(no transcript)'}\n\n${kickoffText ?? KICKOFF_FEEDBACK}`,
+        );
+      } else if (next === 'phase-4-reversal') {
+        geminiRef.current.sendText(
+          `For reference, here's how my first attempt went:\n${t1() || '(no transcript)'}\n\n${kickoffText ?? KICKOFF_REVERSAL}`,
+        );
+      } else if (next === 'phase-6-final') {
+        geminiRef.current.sendText(
+          `First attempt:\n${t1() || '(no transcript)'}\n\nSecond attempt:\n${t2() || '(no transcript)'}\n\n${kickoffText ?? KICKOFF_FINAL}`,
+        );
+      } else if (kickoffText) {
+        setTimeout(() => geminiRef.current.sendText(kickoffText), 300);
       }
-      const span = hi.timeMs - lo.timeMs;
-      const t = span > 0 ? Math.min(1, (elapsed - lo.timeMs) / span) : 1;
-      setFaceMetrics({
-        engagement: lerp(lo.engagement, hi.engagement, t),
-        confidence: lerp(lo.confidence, hi.confidence, t),
-        anxiety: lerp(lo.anxiety, hi.anxiety, t),
-        smiling: lerp(lo.smiling, hi.smiling, t),
-      });
-    }, 200);
-    return () => clearInterval(id);
-  }, [active]);
+    },
+    [buildCtx, withGuardrails],
+  );
 
-  // Live mode only: timed phases advance on the clock. In demo the script drives it.
-  const timed = !DEMO_MODE && isTimedPhase(phase);
+  const advanceToRef = useRef(advanceTo);
+  useEffect(() => { advanceToRef.current = advanceTo; }, [advanceTo]);
+
+  const queueOrAdvance = useCallback(
+    (next: TrinityPhase, kickoff?: string) => {
+      if (geminiRef.current.isPlaying) pendingAdvanceRef.current = { next, kickoff };
+      else void advanceTo(next, kickoff);
+    },
+    [advanceTo],
+  );
+
+  useEffect(() => {
+    if (gemini.isPlaying || !pendingAdvanceRef.current) return;
+    const { next, kickoff } = pendingAdvanceRef.current;
+    pendingAdvanceRef.current = null;
+    void advanceTo(next, kickoff);
+  }, [gemini.isPlaying, advanceTo]);
+
+  const timed = isTimedPhase(phase);
   const timerDuration = phaseDurationSec(phase, lessonLength);
 
   const handleTimerEnd = useCallback(() => {
-    if (phase === 'phase-2-convo-1') setPhase('phase-3-feedback-1');
-    else if (phase === 'phase-4-reversal') setPhase('phase-5-convo-2');
-    else if (phase === 'phase-5-convo-2') setPhase('phase-6-final');
-  }, [phase]);
+    const a = advanceOnTimerEnd(phaseRef.current);
+    if (a) queueOrAdvance(a.next, a.kickoff);
+  }, [queueOrAdvance]);
 
   const timer = useSessionTimer(timerDuration, timed, handleTimerEnd);
 
+  const startedRef = useRef(false);
   useEffect(() => {
-    if (active && user) {
-      const basePrompt = trinityPrompt('phase-1-setup', {
-        topic,
-        scenarioFromCoach: '',
-        emotion: { confidence: 0, anxiety: 0, engagement: 0, smiling: 0 },
-      });
-      const finalPrompt = injectAutismGuardrails(basePrompt, user);
-      gemini.connect(finalPrompt);
-    } else {
-      gemini.disconnect();
+    if (!active || startedRef.current) return;
+    startedRef.current = true;
+
+    (async () => {
+      try {
+        await geminiRef.current.connect(
+          withGuardrails(trinityPrompt('phase-1-setup', buildCtx())),
+        );
+        setTimeout(() => geminiRef.current.sendText('Begin the setup now.'), 400);
+      } catch (e) {
+        console.error('Gemini Live connect failed', e);
+      }
+    })();
+
+    return () => {
+      geminiRef.current.disconnect();
+    };
+  }, [active, buildCtx, withGuardrails]);
+
+  const finalizeRanRef = useRef(false);
+  const goldenRuleRef = useRef<string | null>(null);
+  const earlyScoreRef = useRef<ScoreResult | null>(null);
+  const earlyScoreStartedRef = useRef(false);
+
+  useEffect(() => {
+    if (phase !== 'phase-6-final') return;
+    if (earlyScoreStartedRef.current) return;
+    earlyScoreStartedRef.current = true;
+
+    void scoreConversation({
+      topicLabel: topicRef.current.label,
+      northStar: topicRef.current.northStar,
+      scenario: scenarioRef.current,
+      attempt1: attempt1Ref.current,
+      attempt2: attempt2Ref.current,
+      presence: {
+        engagement: fusedRef.current.engagement,
+        comfort: 100 - fusedRef.current.anxiety,
+        openness: fusedRef.current.smiling,
+      },
+    }).then((result) => {
+      earlyScoreRef.current = result;
+    }).catch(() => {});
+  }, [phase]);
+
+  const finalize = useCallback(async () => {
+    if (finalizeRanRef.current) return;
+    finalizeRanRef.current = true;
+    setPhase('scoring');
+
+    let scoring: ScoreResult | null = earlyScoreRef.current;
+    if (!scoring) {
+      try {
+        scoring = await scoreConversation({
+          topicLabel: topicRef.current.label,
+          northStar: topicRef.current.northStar,
+          scenario: scenarioRef.current,
+          attempt1: attempt1Ref.current,
+          attempt2: attempt2Ref.current,
+          presence: {
+            engagement: fusedRef.current.engagement,
+            comfort: 100 - fusedRef.current.anxiety,
+            openness: fusedRef.current.smiling,
+          },
+        });
+      } catch {
+        // toast handled inside helper
+      }
     }
-  }, [active]);
+
+    geminiRef.current.disconnect();
+
+    const result: SessionResult = {
+      topicLabel: topicRef.current.label,
+      scoring: scoring ?? FALLBACK_SCORE,
+      goldenRule:
+        goldenRuleRef.current ??
+        'Practice one deliberate social rep this week — same scene, one clearer move.',
+    };
+    setPendingResult(result);
+    setSessionComplete(true);
+  }, []);
+
+  const lastSeenRef = useRef(0);
+  useEffect(() => {
+    const msgs = gemini.messages;
+    for (let i = lastSeenRef.current; i < msgs.length; i++) {
+      const m = msgs[i];
+
+      if (m.type === 'user_message') {
+        const text = m.message.content;
+        if (!text) continue;
+        const cur = phaseRef.current;
+        if (cur === 'phase-2-convo-1') attempt1Ref.current.push({ role: 'user', content: text });
+        else if (cur === 'phase-5-convo-2') attempt2Ref.current.push({ role: 'user', content: text });
+      } else if (m.type === 'assistant_message') {
+        const text = m.message.content;
+        if (!text) continue;
+        const cur = phaseRef.current;
+        if (cur === 'phase-2-convo-1') attempt1Ref.current.push({ role: 'assistant', content: text });
+        else if (cur === 'phase-5-convo-2') attempt2Ref.current.push({ role: 'assistant', content: text });
+
+        if (cur === 'phase-1-setup') {
+          scenarioRef.current = text;
+        }
+
+        const adv = advanceOnTranscript(cur, text);
+        if (adv && !advanceGuardRef.current[cur]) {
+          advanceGuardRef.current[cur] = true;
+          if (geminiRef.current.isPlaying) {
+            pendingAdvanceRef.current = { next: adv.next, kickoff: adv.kickoff };
+          } else {
+            void advanceToRef.current(adv.next, adv.kickoff);
+          }
+        }
+
+        if (cur === 'phase-6-final' && detectGoldenRule(text)) {
+          const rule = extractGoldenRule(text);
+          if (rule) goldenRuleRef.current = rule;
+          setTimeout(() => { void finalize(); }, 2000);
+        }
+      }
+    }
+    lastSeenRef.current = msgs.length;
+  }, [gemini.messages, finalize]);
+
+  useEffect(() => {
+    const capMs = untimedPhaseCapMs(phase, lessonLength);
+    if (capMs == null) return;
+    const capped = phase;
+    const id = setTimeout(() => {
+      if (advanceGuardRef.current[capped]) return;
+      const a = advanceOnCap(capped);
+      if (!a) return;
+      advanceGuardRef.current[capped] = true;
+      if (geminiRef.current.isPlaying) {
+        pendingAdvanceRef.current = { next: a.next, kickoff: a.kickoff };
+      } else {
+        void advanceToRef.current(a.next, a.kickoff);
+      }
+    }, capMs);
+    return () => clearTimeout(id);
+  }, [phase, lessonLength]);
+
+  useEffect(() => {
+    if (phase !== 'phase-6-final') return;
+    const id = setTimeout(() => { void finalize(); }, FINAL_DEBRIEF_CAP_MS);
+    return () => clearTimeout(id);
+  }, [phase, finalize]);
 
   const scrollToEnd = useCallback(() => {
     requestAnimationFrame(() => scrollRef.current?.scrollToEnd({ animated: true }));
   }, []);
 
-  const buildResult = (): SessionResult => ({
-    topicLabel: topic.label,
-    scoring: DEMO_SCORE_RESULT,
-    goldenRule: DEMO_GOLDEN_RULE,
-  });
-
   const onEndEarly = () => {
-    gemini.disconnect();
-    onComplete(buildResult());
+    if (phase === 'phase-1-setup' || phase === 'phase-2-convo-1') {
+      void finalize();
+    } else if (phase === 'phase-6-final' || phase === 'scoring') {
+      void finalize();
+    } else {
+      queueOrAdvance('phase-6-final', KICKOFF_WRAP_EARLY);
+    }
   };
 
   if (!active) return null;
 
   const curOrder = PHASE_ORDER[phase];
-  const isComplete = DEMO_MODE && demoSession.isComplete;
-  const isPlaying = (gemini as any).isPlaying as boolean;
-  // The avatar represents the coach (voice A), so the ring pulses for every
-  // coach line -- coach, coach-as-Jordan ("partner") and coach-as-Alex
-  // ("self") -- and stays still only while the user ("you") has the floor.
-  const currentSpeaker = (gemini as any).currentSpeaker as string | null | undefined;
-  const coachSpeaking = isPlaying && currentSpeaker !== 'you';
+  const coachSpeaking = gemini.isPlaying;
 
   return (
     <View className="flex-1 bg-background pt-3 px-4">
-      {/* Progress bar (pinned) */}
       <View className="flex-row items-start mb-3">
         {TRINITY_PHASES.map((p) => {
           const isPast = PHASE_ORDER[p] < curOrder;
@@ -183,7 +387,6 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
         })}
       </View>
 
-      {/* Coach avatar header (pinned) */}
       <View className="flex-row items-center justify-between rounded-2xl border border-border bg-surface px-4 py-3 mb-3">
         <View className="flex-row items-center flex-1">
           <View className="mr-3">
@@ -226,9 +429,7 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
         </View>
       </View>
 
-      {isComplete ? (
-        /* Session finished: drop the transcript + camera entirely and show a
-           clean, full-height completion state with the results CTA. */
+      {sessionComplete && pendingResult ? (
         <View className="flex-1 items-center justify-center px-6 pb-6">
           <View className="h-20 w-20 rounded-full items-center justify-center bg-engagement/15 mb-6">
             <CheckCircle2 size={44} color="#22c55e" />
@@ -239,7 +440,7 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
           </Text>
           <TouchableOpacity
             accessibilityLabel="See results"
-            onPress={() => onComplete(buildResult())}
+            onPress={() => onComplete(pendingResult)}
             className="flex-row items-center justify-center bg-primary rounded-full py-4 w-full"
           >
             <Text className="text-primary-foreground font-bold text-base mr-2">See your results</Text>
@@ -248,21 +449,16 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
         </View>
       ) : (
         <>
-          {/* Conversation */}
           <View
             className="rounded-2xl border border-border bg-surface overflow-hidden mb-3"
             style={{ flex: 1, flexShrink: 1, minHeight: 0 }}
           >
             <ScrollView ref={scrollRef} className="flex-1 px-4 py-4" onContentSizeChange={scrollToEnd}>
               {gemini.messages.map((m, i) => {
-                const speaker = (m as any).speaker ?? (m.type === 'user_message' ? 'you' : 'coach');
-                // ONE rule, no exceptions: whoever is TALKING decides the side.
-                // The coach talking (coach / partner / self) is always on the LEFT.
-                // The user talking ("you") is always on the RIGHT in orange --
-                // whichever character they happen to be voicing that phase.
+                const speaker = m.speaker ?? (m.type === 'user_message' ? 'you' : 'coach');
                 const isMine = speaker === 'you';
                 const meta = SPEAKER_META[speaker] ?? SPEAKER_META.coach;
-                const label = (m as any).name ?? meta.name;
+                const label = m.name ?? meta.name;
                 return (
                   <View key={i} className={`mb-3 ${isMine ? 'items-end' : 'items-start'}`}>
                     <Text className="text-[10px] font-semibold mb-1 px-1" style={{ color: meta.color }}>{label}</Text>
@@ -282,13 +478,16 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
             </View>
           </View>
 
-          {/* Camera + live metrics — pinned footer above tab bar */}
           <View className="mb-2" style={{ zIndex: 10, elevation: 10 }}>
             <EmotionPanel
               active={active}
               cameraGranted={cameraGranted}
               metrics={fused}
               evi={gemini.status.value}
+              cameraRef={cameraRef}
+              bridgeRef={bridgeRef}
+              onMetrics={setFaceMetrics}
+              onCameraReady={() => setCameraReady(true)}
             />
           </View>
         </>
@@ -297,7 +496,6 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
   );
 };
 
-/** Pulsing ring around the coach avatar while the coach is speaking. */
 const SpeakingRing = ({ active, children }: { active: boolean; children: React.ReactNode }) => {
   const pulse = useRef(new Animated.Value(0)).current;
   useEffect(() => {

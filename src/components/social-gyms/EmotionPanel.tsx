@@ -1,10 +1,9 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, type RefObject } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CameraView } from 'expo-camera';
-import { FaceTrackerBridge } from '../FaceTrackerBridge';
+import { FaceTrackerBridge, type FaceTrackerBridgeHandle } from '../FaceTrackerBridge';
 import { useAuth } from '../../components/AuthProvider';
 import type { EmotionMetrics } from '../../lib/emotion';
-import { DEMO_MODE } from '../../lib/utils';
 
 interface EmotionPanelProps {
   active: boolean;
@@ -12,10 +11,12 @@ interface EmotionPanelProps {
   cameraGranted: boolean;
   metrics: EmotionMetrics;
   evi: string;
+  cameraRef: RefObject<CameraView | null>;
+  bridgeRef: RefObject<FaceTrackerBridgeHandle | null>;
+  onMetrics: (metrics: EmotionMetrics) => void;
+  onCameraReady: () => void;
 }
 
-// Raw colours (RN style props can't read the CSS tokens). Mirror the
-// engagement / comfort / openness tokens in global.css and add two more.
 const METRIC_COLORS = {
   engagement: '#34C759',
   comfort: '#F5A340',
@@ -75,10 +76,17 @@ const LivePulse = ({ active }: { active: boolean }) => {
   );
 };
 
-export const EmotionPanel = ({ active, cameraGranted, metrics }: EmotionPanelProps) => {
+export const EmotionPanel = ({
+  active,
+  cameraGranted,
+  metrics,
+  evi: _evi,
+  cameraRef,
+  bridgeRef,
+  onMetrics,
+  onCameraReady,
+}: EmotionPanelProps) => {
   const { user } = useAuth();
-
-  const runFaceBridge = !DEMO_MODE;
 
   const showCamera = active && cameraGranted;
 
@@ -92,20 +100,19 @@ export const EmotionPanel = ({ active, cameraGranted, metrics }: EmotionPanelPro
 
   return (
     <View className="flex-row gap-3">
-      {/* Square, mirrored camera self-view on the left */}
       <View className="w-36 aspect-square rounded-2xl overflow-hidden border border-border bg-black relative">
         {showCamera ? (
           <>
-            <CameraView style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]} facing="front" />
-            {runFaceBridge && <FaceTrackerBridge enabled={active} onMetrics={(_m: any) => {}} />}
+            <CameraView
+              ref={cameraRef}
+              style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
+              facing="front"
+              onCameraReady={onCameraReady}
+            />
+            <FaceTrackerBridge ref={bridgeRef} enabled={active} onMetrics={onMetrics} />
             <View className="absolute top-2 left-2">
               <LivePulse active={active} />
             </View>
-            {DEMO_MODE && (
-              <View className="absolute bottom-2 left-2 right-2 rounded-md bg-black/55 px-2 py-1">
-                <Text className="text-white text-[8px] uppercase tracking-widest text-center">Simulated metrics</Text>
-              </View>
-            )}
           </>
         ) : (
           <View className="flex-1 items-center justify-center">
@@ -114,7 +121,6 @@ export const EmotionPanel = ({ active, cameraGranted, metrics }: EmotionPanelPro
         )}
       </View>
 
-      {/* Animated scores beside it */}
       <View className="flex-1 bg-surface-2 rounded-2xl border border-border px-4 py-3">
         <View className="flex-row items-center justify-between mb-3">
           <Text className="text-sm font-semibold text-foreground">Real-time presence</Text>
