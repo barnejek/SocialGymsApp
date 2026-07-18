@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../components/AuthProvider';
 import { GraduationCap, Users, CheckCircle2, TrendingUp, AlertTriangle } from 'lucide-react-native';
+import { COLORS } from '../../constants/colors';
 
 export default function EnterprisePortalScreen() {
   const { user, logout } = useAuth();
@@ -41,12 +42,12 @@ export default function EnterprisePortalScreen() {
           <View>
             <View className="flex-row space-x-4 mb-6">
               <View className="flex-1 bg-surface border border-border rounded-2xl p-4 items-center">
-                <Users size={32} color="#2563eb" />
+                <Users size={32} color={COLORS.primary} />
                 <Text className="text-2xl font-bold text-foreground mt-3">2,401</Text>
                 <Text className="text-xs text-muted-foreground mt-1 uppercase tracking-wider text-center">Active Users</Text>
               </View>
               <View className="flex-1 bg-surface border border-border rounded-2xl p-4 items-center">
-                <TrendingUp size={32} color="#22c55e" />
+                <TrendingUp size={32} color={COLORS.engagement} />
                 <Text className="text-2xl font-bold text-foreground mt-3">82%</Text>
                 <Text className="text-xs text-muted-foreground mt-1 uppercase tracking-wider text-center">Avg Presence</Text>
               </View>
@@ -54,7 +55,7 @@ export default function EnterprisePortalScreen() {
 
             <View className="bg-surface border border-border rounded-xl p-6 mb-6">
               <View className="flex-row items-center mb-4">
-                <AlertTriangle size={24} color="#F5A340" />
+                <AlertTriangle size={24} color={COLORS.primary} />
                 <Text className="text-foreground font-bold text-lg ml-2">Top Corporate Weakness</Text>
               </View>
               <Text className="text-foreground font-medium text-lg">Conflict Resolution</Text>
@@ -105,7 +106,7 @@ export default function EnterprisePortalScreen() {
         
         <View className="bg-surface border border-border rounded-xl p-4 mb-4">
           <View className="flex-row items-center mb-2">
-            <CheckCircle2 size={16} color="#22c55e" className="mr-2" />
+            <CheckCircle2 size={16} color={COLORS.engagement} className="mr-2" />
             <Text className="font-medium text-foreground">Coffee Shop Order</Text>
           </View>
           <Text className="text-sm text-muted-foreground">

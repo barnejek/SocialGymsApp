@@ -4,6 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { ArrowLeft, Save } from 'lucide-react-native';
 import { useAuth } from '../../components/AuthProvider';
+import { COLORS } from '../../constants/colors';
 
 export default function EditProfileScreen() {
   const router = useRouter();
@@ -16,7 +17,7 @@ export default function EditProfileScreen() {
     <SafeAreaView className="flex-1 bg-background" edges={['top']}>
       <View className="flex-row items-center justify-between px-4 pt-4 pb-6 border-b border-border">
         <TouchableOpacity onPress={() => router.back()} className="h-10 w-10 items-center justify-center bg-surface rounded-full border border-border">
-          <ArrowLeft size={20} color="#f8fafc" />
+          <ArrowLeft size={20} color={COLORS.foreground} />
         </TouchableOpacity>
         <Text className="text-xl font-bold text-foreground">Edit Profile</Text>
         <View className="h-10 w-10" />
@@ -29,7 +30,7 @@ export default function EditProfileScreen() {
             value={name}
             onChangeText={setName}
             className="w-full bg-surface border border-border rounded-xl p-4 text-foreground text-lg"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={COLORS.mutedForeground}
           />
         </View>
 
@@ -40,7 +41,7 @@ export default function EditProfileScreen() {
             onChangeText={setEmail}
             keyboardType="email-address"
             className="w-full bg-surface border border-border rounded-xl p-4 text-foreground text-lg"
-            placeholderTextColor="#64748b"
+            placeholderTextColor={COLORS.mutedForeground}
           />
         </View>
 
@@ -52,8 +53,8 @@ export default function EditProfileScreen() {
           <Switch 
             value={isPublic}
             onValueChange={setIsPublic}
-            trackColor={{ false: '#334155', true: '#2563eb' }}
-            thumbColor={'#ffffff'}
+            trackColor={{ false: COLORS.muted, true: COLORS.primary }}
+            thumbColor={COLORS.white}
           />
         </View>
 
@@ -61,7 +62,7 @@ export default function EditProfileScreen() {
           onPress={() => router.back()}
           className="w-full bg-primary py-4 rounded-xl items-center justify-center flex-row"
         >
-          <Save size={20} color="#ffffff" className="mr-2" />
+          <Save size={20} color={COLORS.primaryForeground} className="mr-2" />
           <Text className="text-primary-foreground font-bold text-lg">Save Changes</Text>
         </TouchableOpacity>
       </ScrollView>

@@ -1,8 +1,10 @@
 import '../global.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
+import { View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '../components/AuthProvider';
 import { GamificationProvider } from '../components/GamificationProvider';
+import { personaTheme } from '../constants/themes';
 import { useEffect } from 'react';
 
 function RootLayoutNav() {
@@ -20,11 +22,18 @@ function RootLayoutNav() {
     }
   }, [user, segments]);
 
+  // Persona theme: overrides the global.css variables for every token class
+  // below this View (b2c = default navy/orange; autism = light low-stimulus;
+  // enterprise = neutral slate).
+  const theme = personaTheme(user?.persona);
+
   return (
-    <Stack screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="(auth)/login" />
-      <Stack.Screen name="(tabs)" />
-    </Stack>
+    <View style={[{ flex: 1 }, theme.vars]}>
+      <Stack screenOptions={{ headerShown: false }}>
+        <Stack.Screen name="(auth)/login" />
+        <Stack.Screen name="(tabs)" />
+      </Stack>
+    </View>
   );
 }
 

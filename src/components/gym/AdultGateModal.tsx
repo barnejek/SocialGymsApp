@@ -3,6 +3,7 @@ import { ActivityIndicator, Modal, Pressable, Text, View } from 'react-native';
 import { Heart } from 'lucide-react-native';
 import { setAdultAttestation } from '../../lib/gamification';
 import { useGamification } from '../GamificationProvider';
+import { COLORS } from '../../constants/colors';
 
 /**
  * One-time self-attestation gate for the Romance & Dating path.
@@ -41,7 +42,7 @@ export const AdultGateModal = ({
       <View className="flex-1 items-center justify-center bg-black/70 px-6">
         <View className="w-full max-w-sm rounded-3xl border border-border bg-surface p-6">
           <View className="flex-row items-center mb-3">
-            <Heart size={20} color="#F5A340" />
+            <Heart size={20} color={COLORS.primary} />
             <Text className="text-lg font-bold text-foreground ml-2">Romance &amp; Dating</Text>
           </View>
           <Text className="text-sm text-muted-foreground leading-relaxed">
@@ -64,7 +65,7 @@ export const AdultGateModal = ({
               accessibilityRole="button"
               className={`px-4 py-2.5 rounded-full bg-primary flex-row items-center ${busy ? 'opacity-60' : ''}`}
             >
-              {busy && <ActivityIndicator size="small" color="#0e1424" style={{ marginRight: 6 }} />}
+              {busy && <ActivityIndicator size="small" color={COLORS.primaryForeground} style={{ marginRight: 6 }} />}
               <Text className="text-sm font-bold text-primary-foreground">I'm 18 or older</Text>
             </Pressable>
           </View>

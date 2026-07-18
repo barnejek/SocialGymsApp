@@ -9,6 +9,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AudioContext, type AudioBufferQueueSourceNode } from "react-native-audio-api";
 import { Buffer } from "buffer";
+import { DEMO_MODE } from "../lib/utils";
+import { DEMO_SCRIPT } from "../lib/mockBackend";
 
 // Native module — unavailable in Expo Go / web. Soft-require so Metro can still bundle.
 let LiveAudioStream: {
@@ -49,7 +51,150 @@ function decodePcm16ToFloat32(b64: string): Float32Array {
   return f32;
 }
 
+// ---------------------------------------------------------------------------
+// DEMO_MODE engine — same public interface as the real hook, but plays back
+// the scripted session from lib/mockBackend.ts. The coach lines carry the
+// exact sentinel phrases, so the REAL phase machine and REAL timers in
+// TrinityCoachSession drive the transitions. No WebSocket, no mic, no quota.
+// ---------------------------------------------------------------------------
+
+/** ~230 wpm reading pace for the fake "coach is speaking" window. */
+const demoSpeakMs = (text: string) =>
+  Math.max(1400, text.split(/\s+/).length * 260);
+
+function useGeminiLiveDemo(): ReturnType<typeof useGeminiLiveReal> {
+  const [status, setStatus] = useState<{ value: GeminiLiveStatus }>({ value: "disconnected" });
+  const [messages, setMessages] = useState<GeminiMessage[]>([]);
+  const [isMuted, setIsMuted] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+
+  const timersRef = useRef<ReturnType<typeof setTimeout>[]>([]);
+  // Bumped on every phase change / disconnect so stale timers become no-ops.
+  const runIdRef = useRef(0);
+
+  const clearTimers = useCallback(() => {
+    timersRef.current.forEach(clearTimeout);
+    timersRef.current = [];
+  }, []);
+
+  /** Queue one scripted phase; delays are real so the session paces naturally. */
+  const playPhase = useCallback(
+    (phaseNum: number) => {
+      runIdRef.current += 1;
+      const runId = runIdRef.current;
+      clearTimers();
+
+      const script = DEMO_SCRIPT[phaseNum] ?? [];
+      let at = 0;
+      for (const line of script) {
+        at += line.preDelayMs;
+        const startAt = at;
+        const isAssistant = line.speaker !== "you";
+        const speakMs = demoSpeakMs(line.text);
+
+        timersRef.current.push(
+          setTimeout(() => {
+            if (runId !== runIdRef.current) return;
+            if (isAssistant) {
+              setIsPlaying(true);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  type: "assistant_message",
+                  message: { role: "assistant", content: line.text },
+                  speaker: line.speaker,
+                },
+              ]);
+            } else {
+              setLastUserMessage(line.text);
+              setMessages((prev) => [
+                ...prev,
+                {
+                  type: "user_message",
+                  message: { role: "user", content: line.text },
+                  speaker: "you",
+                },
+              ]);
+            }
+          }, startAt),
+        );
+
+        if (isAssistant) {
+          timersRef.current.push(
+            setTimeout(() => {
+              if (runId !== runIdRef.current) return;
+              setIsPlaying(false);
+            }, startAt + speakMs),
+          );
+        }
+        at += speakMs;
+      }
+    },
+    [clearTimers],
+  );
+
+  const phaseFromPrompt = (systemPrompt: string): number => {
+    const m = systemPrompt.match(/YOU ARE IN: PHASE (\d)/);
+    return m ? Number(m[1]) : 0;
+  };
+
+  const connect = useCallback(
+    async (systemPrompt: string) => {
+      setStatus({ value: "connecting" });
+      setMessages([]);
+      setLastUserMessage(null);
+      await new Promise((r) => setTimeout(r, 600)); // believable connect beat
+      setStatus({ value: "connected" });
+      playPhase(phaseFromPrompt(systemPrompt));
+    },
+    [playPhase],
+  );
+
+  const updateSystemPrompt = useCallback(
+    async (systemPrompt: string) => {
+      playPhase(phaseFromPrompt(systemPrompt));
+    },
+    [playPhase],
+  );
+
+  const disconnect = useCallback(() => {
+    runIdRef.current += 1;
+    clearTimers();
+    setStatus({ value: "disconnected" });
+    setIsPlaying(false);
+  }, [clearTimers]);
+
+  useEffect(() => disconnect, [disconnect]);
+
+  // Kickoff texts are already answered by the script; nothing to send.
+  const sendText = useCallback((_text: string) => {}, []);
+  const mute = useCallback(() => setIsMuted(true), []);
+  const unmute = useCallback(() => setIsMuted(false), []);
+
+  return {
+    status,
+    messages,
+    isMuted,
+    isPlaying,
+    lastUserMessage,
+    connect,
+    disconnect,
+    updateSystemPrompt,
+    sendText,
+    mute,
+    unmute,
+  };
+}
+
 export function useGeminiLive(apiKey: string) {
+  // DEMO_MODE is a build-time constant, so the branch is stable across renders
+  // and the rules-of-hooks invariant holds.
+  // eslint-disable-next-line react-hooks/rules-of-hooks
+  return DEMO_MODE ? useGeminiLiveDemo() : useGeminiLiveReal(apiKey);
+}
+
+function useGeminiLiveReal(apiKey: string) {
   const [status, setStatus] = useState<{ value: GeminiLiveStatus }>({ value: "disconnected" });
   const [messages, setMessages] = useState<GeminiMessage[]>([]);
   const [isMuted, setIsMuted] = useState(false);

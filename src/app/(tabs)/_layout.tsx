@@ -2,21 +2,23 @@ import React from 'react';
 import { Tabs } from 'expo-router';
 import { Dumbbell, LayoutDashboard, Settings, Award, FlaskConical } from 'lucide-react-native';
 import { useAuth } from '../../components/AuthProvider';
+import { personaTheme } from '../../constants/themes';
 
 export default function TabLayout() {
   const { user } = useAuth();
 
   // Conditionally hide tabs based on persona
   const isEducator = user?.persona === 'b2b_educator';
+  const theme = personaTheme(user?.persona);
 
   return (
     <Tabs screenOptions={{
       headerShown: false,
-      tabBarActiveTintColor: '#2563eb',
-      tabBarInactiveTintColor: '#64748b',
+      tabBarActiveTintColor: theme.colors.tabBarActive,
+      tabBarInactiveTintColor: theme.colors.tabBarInactive,
       tabBarStyle: {
-        backgroundColor: '#0f172a',
-        borderTopColor: '#1e293b',
+        backgroundColor: theme.colors.surface,
+        borderTopColor: theme.colors.border,
       }
     }}>
       <Tabs.Screen

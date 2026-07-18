@@ -3,6 +3,8 @@ import type { RefObject } from "react";
 import type { EmotionMetrics } from "@/lib/emotion";
 import type { CameraView } from "expo-camera";
 import type { FaceTrackerBridgeHandle } from "../components/FaceTrackerBridge";
+import { DEMO_MODE } from "../lib/utils";
+import { demoMetricsAt } from "../lib/mockBackend";
 
 interface Options {
   cameraRef: RefObject<CameraView | null>;
@@ -32,7 +34,20 @@ export function useFaceCapture({
   const gatedRef = useRef(gated);
   useEffect(() => { gatedRef.current = gated; }, [gated]);
 
+  // DEMO_MODE: no camera, no WebView bridge — animate the scripted emotion
+  // timeline instead so the gauges tell the session's story deterministically.
   useEffect(() => {
+    if (!DEMO_MODE || !enabled) return;
+    const start = Date.now();
+    const id = setInterval(() => {
+      if (!gatedRef.current) return;
+      onMetricsRef.current(demoMetricsAt(Date.now() - start));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [enabled]);
+
+  useEffect(() => {
+    if (DEMO_MODE) return;
     if (!enabled || !cameraReady) return;
     if (!cameraRef.current || !bridgeRef.current) return;
 

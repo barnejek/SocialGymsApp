@@ -5,6 +5,7 @@ import { Results, type SessionResult } from '../social-gyms/Results';
 import { useGamification } from '../GamificationProvider';
 import { completeSession, type CompleteSessionResult } from '../../lib/gamification';
 import type { ScoreResult } from '../../lib/chat';
+import { COLORS } from '../../constants/colors';
 
 // ---------------------------------------------------------------------------
 // End-of-session flow for gamified sessions: sends both attempts to the
@@ -60,7 +61,7 @@ export const GymSessionComplete = ({
   if (phase === 'scoring') {
     return (
       <View className="flex-1 items-center justify-center px-6">
-        <ActivityIndicator size="large" color="#F5A340" accessibilityLabel="Scoring your session" />
+        <ActivityIndicator size="large" color={COLORS.primary} accessibilityLabel="Scoring your session" />
         <Text className="mt-6 text-sm text-muted-foreground">
           Your coach is scoring both attempts…
         </Text>

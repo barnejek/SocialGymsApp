@@ -7,6 +7,7 @@ import { Check, Clock, Dumbbell, Flame, Play, Settings2, TrendingUp } from 'luci
 import { useAuth } from '../../components/AuthProvider';
 import { useGamification } from '../../components/GamificationProvider';
 import { ProgressRing, RING_COLORS } from '../../components/gym/ProgressRing';
+import { COLORS } from '../../constants/colors';
 import {
   compositeOf,
   presenceRating,
@@ -206,7 +207,7 @@ export default function DashboardScreen() {
               accessibilityLabel="Profile settings"
               className="h-10 w-10 bg-surface rounded-full border border-border items-center justify-center"
             >
-              <Settings2 size={20} color="#64748b" />
+              <Settings2 size={20} color={COLORS.mutedForeground} />
             </TouchableOpacity>
             <TouchableOpacity
               onPress={logout}
@@ -284,7 +285,7 @@ export default function DashboardScreen() {
             </Text>
           </View>
           <View className="bg-primary-foreground/20 h-12 w-12 rounded-full items-center justify-center">
-            <Play color="#ffffff" size={24} fill="#ffffff" />
+            <Play color={COLORS.primaryForeground} size={24} fill={COLORS.primaryForeground} />
           </View>
         </TouchableOpacity>
 
@@ -297,7 +298,7 @@ export default function DashboardScreen() {
           accessibilityLabel="Workout history"
         >
           <View className="flex-row items-center">
-            <Clock size={20} color="#64748b" />
+            <Clock size={20} color={COLORS.mutedForeground} />
             <Text className="text-foreground font-semibold ml-3">Workout history</Text>
           </View>
           <Text className="text-muted-foreground text-sm tabular-nums">

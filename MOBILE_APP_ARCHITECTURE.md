@@ -4,7 +4,7 @@ This document provides a detailed breakdown of the Social Gyms Mobile App (built
 
 ## 📌 Current Status (June 2026 — MIT EPGM VC pitch build)
 
-* **Backend is a mockup** (`src/lib/mockBackend.ts`, `src/lib/gamification.ts`). No Supabase connection on purpose — keep it that way until after the pitch.
+* **Backend is partially mocked** for personas (`src/lib/mockBackend.ts`), but **gamification uses real Supabase** (`src/lib/gamification.ts`).
 * **The live voice/video engine is intentionally disabled**: mic streaming in `useGeminiLive.ts` and the camera→WebView pipeline are commented out / stubbed because the native modules don't run under plain `npx expo start` (they need a dev client). Do not re-enable without reading `ToDo.md` §2, which documents the wiring gaps and the recommended integration path.
 * **`ToDo.md`** in this folder is the living improvement plan: bug changelog, engine integration plan, per-screen logic/personalization items, and visual design direction.
 * The leftover Expo starter template files (Explore screen, `themed-*` components, template hooks/theme) have been removed.

@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Repeat2, Dumbbell, MessagesSquare, Eye } from 'lucide-react-native';
+import { COLORS } from '../../constants/colors';
 
 /**
  * The Science screen — the mobile counterpart of the web landing page's
@@ -11,7 +12,7 @@ import { Repeat2, Dumbbell, MessagesSquare, Eye } from 'lucide-react-native';
  * as chips, four evidence pillars, one citations line.
  */
 
-const PRIMARY = '#F5A340'; // hsl(30 92% 61%)
+const PRIMARY = COLORS.primary;
 
 const STEPS: Array<{ n: number; label: string; method: string }> = [
   { n: 1, label: 'Setup', method: 'One sub-skill, one scene' },

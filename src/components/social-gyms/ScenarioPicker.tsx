@@ -5,6 +5,7 @@ import { Button } from '../ui/Button';
 import { topics, type TopicId } from '../../lib/topics';
 import { LESSON_LENGTHS, type LessonLength } from '../../lib/phases';
 import { Coffee, Users, Flame, Megaphone, Check, Clock } from 'lucide-react-native';
+import { COLORS } from '../../constants/colors';
 
 const iconFor = (icon: string) => {
   if (icon === "users") return Users;
@@ -42,7 +43,7 @@ export const ScenarioPicker = ({ selected, onSelect, length, onLengthChange, onC
       {/* Lesson length */}
       <View className="mt-4 flex-col items-center mb-8">
         <View className="flex-row items-center mb-3">
-          <Clock size={14} color="#A1A1AA" />
+          <Clock size={14} color={COLORS.mutedForeground} />
           <Text className="ml-1.5 text-xs font-medium uppercase tracking-wider text-muted-foreground">
             How long do you want to train?
           </Text>
@@ -55,13 +56,7 @@ export const ScenarioPicker = ({ selected, onSelect, length, onLengthChange, onC
               <Pressable
                 key={len}
                 onPress={() => onLengthChange(len)}
-                style={{ 
-                  borderRadius: 9999, 
-                  paddingHorizontal: 20, 
-                  paddingVertical: 8, 
-                  backgroundColor: active ? '#2563eb' : 'transparent',
-                  shadowOpacity: active ? 0.1 : 0 
-                }}
+                className={`rounded-full px-5 py-2 ${active ? 'bg-primary' : 'bg-transparent'}`}
               >
                 <Text className={`text-sm font-semibold ${
                   active ? "text-primary-foreground" : "text-muted-foreground"
@@ -83,29 +78,21 @@ export const ScenarioPicker = ({ selected, onSelect, length, onLengthChange, onC
             <Pressable
               key={s.id}
               onPress={() => onSelect(s.id)}
-              style={{
-                flexDirection: 'row',
-                width: '100%',
-                alignItems: 'flex-start',
-                borderRadius: 16,
-                borderWidth: 1,
-                padding: 20,
-                marginBottom: 16,
-                backgroundColor: isSelected ? '#1e293b' : '#0f172a',
-                borderColor: isSelected ? '#2563eb' : '#334155'
-              }}
+              className={`flex-row w-full items-start rounded-2xl border p-5 mb-4 ${
+                isSelected ? 'bg-surface-2 border-primary' : 'bg-surface border-border'
+              }`}
             >
               <View
                 className={`h-12 w-12 items-center justify-center rounded-xl mr-4 ${
                   isSelected ? "bg-primary" : "bg-muted"
                 }`}
               >
-                <Icon size={20} color={isSelected ? "#0e1424" : "#f4f4f5"} />
+                <Icon size={20} color={isSelected ? COLORS.primaryForeground : COLORS.foreground} />
               </View>
               <View className="flex-1">
                 <View className="flex-row items-center justify-between mb-1">
                   <Text className="text-lg font-semibold text-foreground">{s.shortLabel}</Text>
-                  {isSelected && <Check size={16} color="#F5A340" />}
+                  {isSelected && <Check size={16} color={COLORS.primary} />}
                 </View>
                 <Text className="text-sm text-foreground/80">{s.description}</Text>
               </View>

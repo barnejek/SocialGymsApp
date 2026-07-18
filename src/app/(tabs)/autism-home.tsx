@@ -4,6 +4,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../../components/AuthProvider';
 import { Play, Info, ShieldCheck, Heart } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
+import { personaTheme } from '../../constants/themes';
+
+// Carer portal renders under the calm autism theme.
+const CALM = personaTheme('b2b_autism_user').colors;
 
 // Mock per-goal progress; in production this comes from session history.
 const GOAL_PROGRESS = [40, 85, 60];
@@ -30,7 +34,7 @@ export default function AutismHomeScreen() {
         {/* Carer Info Panel */}
         <View className="bg-surface/50 border border-primary/30 rounded-2xl p-6 mb-6">
           <View className="flex-row items-center mb-4">
-            <ShieldCheck color="#2563eb" size={24} />
+            <ShieldCheck color={CALM.primary} size={24} />
             <Text className="text-foreground font-bold text-lg ml-2">Active Guardrails</Text>
           </View>
           <Text className="text-muted-foreground text-sm mb-4 leading-relaxed">
@@ -43,7 +47,7 @@ export default function AutismHomeScreen() {
         {/* IEP Goals */}
         <View className="bg-surface border border-border rounded-2xl p-6 mb-8">
           <View className="flex-row items-center mb-4">
-            <Heart color="#F5A340" size={24} />
+            <Heart color={CALM.primary} size={24} />
             <Text className="text-foreground font-bold text-lg ml-2">Today's Focus (IEP)</Text>
           </View>
           
@@ -70,7 +74,7 @@ export default function AutismHomeScreen() {
           className="bg-primary/90 rounded-2xl p-6 mb-12 flex-row items-center justify-center"
         >
           <Play color="#ffffff" size={24} fill="#ffffff" />
-          <Text className="text-primary-foreground font-bold text-xl ml-3">Begin Session</Text>
+          <Text className="text-white font-bold text-xl ml-3">Begin Session</Text>
         </TouchableOpacity>
 
       </ScrollView>

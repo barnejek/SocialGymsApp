@@ -39,6 +39,7 @@ import {
   type LessonLength,
 } from '../../lib/phases';
 import { applyDifficulty, type DifficultyLevel, type Topic } from '../../lib/topics';
+import { COLORS } from '../../constants/colors';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? 'dummy-key-for-now';
 
@@ -68,10 +69,10 @@ interface Props {
 }
 
 const SPEAKER_META: Record<string, { name: string; color: string }> = {
-  coach: { name: 'Coach', color: '#cbd5e1' },
-  partner: { name: 'Jordan', color: '#3B9EF5' },
-  self: { name: 'Coach · as Alex', color: '#cbd5e1' },
-  you: { name: 'You', color: '#F5A340' },
+  coach: { name: 'Coach', color: COLORS.mutedForeground },
+  partner: { name: 'Jordan', color: COLORS.openness },
+  self: { name: 'Coach · as Alex', color: COLORS.mutedForeground },
+  you: { name: 'You', color: COLORS.primary },
 };
 
 export const TrinityCoachSession = ({
@@ -452,14 +453,14 @@ export const TrinityCoachSession = ({
               gemini.isMuted ? 'border-destructive/60 bg-destructive/10' : 'border-engagement/60 bg-engagement/10'
             }`}
           >
-            {gemini.isMuted ? <MicOff size={16} color="#ef4444" /> : <Mic size={16} color="#22c55e" />}
+            {gemini.isMuted ? <MicOff size={16} color={COLORS.destructive} /> : <Mic size={16} color={COLORS.engagement} />}
           </TouchableOpacity>
           <TouchableOpacity
             accessibilityLabel="End session"
             onPress={onEndEarly}
             className="flex-row items-center rounded-full border border-border px-3 py-1.5"
           >
-            <PhoneOff size={12} color="#a1a1aa" />
+            <PhoneOff size={12} color={COLORS.mutedForeground} />
             <Text className="text-xs text-muted-foreground ml-1">End</Text>
           </TouchableOpacity>
         </View>
@@ -468,7 +469,7 @@ export const TrinityCoachSession = ({
       {sessionComplete && pendingResult ? (
         <View className="flex-1 items-center justify-center px-6 pb-6">
           <View className="h-20 w-20 rounded-full items-center justify-center bg-engagement/15 mb-6">
-            <CheckCircle2 size={44} color="#22c55e" />
+            <CheckCircle2 size={44} color={COLORS.engagement} />
           </View>
           <Text className="text-2xl font-bold text-foreground text-center">Session complete</Text>
           <Text className="text-sm text-muted-foreground text-center mt-2 mb-8 max-w-[300px] leading-relaxed">
@@ -480,7 +481,7 @@ export const TrinityCoachSession = ({
             className="flex-row items-center justify-center bg-primary rounded-full py-4 w-full"
           >
             <Text className="text-primary-foreground font-bold text-base mr-2">See your results</Text>
-            <ArrowRight size={18} color="#0e1424" />
+            <ArrowRight size={18} color={COLORS.primaryForeground} />
           </TouchableOpacity>
         </View>
       ) : (
@@ -562,7 +563,7 @@ const SpeakingRing = ({ active, children }: { active: boolean; children: React.R
             width: 40,
             height: 40,
             borderRadius: 20,
-            backgroundColor: '#F5A340',
+            backgroundColor: COLORS.primary,
             transform: [{ scale }],
             opacity,
           }}

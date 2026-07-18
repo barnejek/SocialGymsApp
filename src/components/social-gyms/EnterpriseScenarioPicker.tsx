@@ -4,6 +4,7 @@ import { Button } from '../ui/Button';
 import { topics, type TopicId } from '../../lib/topics';
 import { LESSON_LENGTHS, type LessonLength } from '../../lib/phases';
 import { Coffee, Users, Flame, Megaphone, Check } from 'lucide-react-native';
+import { COLORS } from '../../constants/colors';
 
 const iconFor = (icon: string) => {
   if (icon === "users") return Users;
@@ -41,17 +42,10 @@ export const EnterpriseScenarioPicker = ({ selected, onSelect, length, onLengthC
             <Pressable
               key={s.id}
               onPress={() => onSelect(s.id)}
-              style={{
-                width: 280,
-                height: 320,
-                borderRadius: 16,
-                borderWidth: 2,
-                padding: 24,
-                marginRight: 16,
-                backgroundColor: isSelected ? '#1e293b' : '#0f172a',
-                borderColor: isSelected ? '#F5A340' : '#334155',
-                justifyContent: 'space-between'
-              }}
+              style={{ width: 280, height: 320 }}
+              className={`rounded-2xl border-2 p-6 mr-4 justify-between ${
+                isSelected ? 'bg-surface-2 border-primary' : 'bg-surface border-border'
+              }`}
             >
               <View>
                 <View
@@ -59,7 +53,7 @@ export const EnterpriseScenarioPicker = ({ selected, onSelect, length, onLengthC
                     isSelected ? "bg-primary" : "bg-muted"
                   }`}
                 >
-                  <Icon size={32} color={isSelected ? "#ffffff" : "#f4f4f5"} />
+                  <Icon size={32} color={isSelected ? COLORS.primaryForeground : COLORS.foreground} />
                 </View>
                 <Text className="text-2xl font-bold text-foreground mb-3">{s.label}</Text>
                 <Text className="text-sm text-foreground/70 leading-relaxed">{s.description}</Text>
@@ -69,7 +63,7 @@ export const EnterpriseScenarioPicker = ({ selected, onSelect, length, onLengthC
                 <Text className="text-xs font-bold uppercase tracking-widest text-primary">
                   {s.tag}
                 </Text>
-                {isSelected && <Check size={24} color="#F5A340" />}
+                {isSelected && <Check size={24} color={COLORS.primary} />}
               </View>
             </Pressable>
           );

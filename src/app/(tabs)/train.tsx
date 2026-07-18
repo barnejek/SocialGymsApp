@@ -21,14 +21,12 @@ import {
   type TopicId,
 } from '../../lib/topics';
 import { DEFAULT_LESSON_LENGTH, type LessonLength } from '../../lib/phases';
+import { DEMO_MODE } from '../../lib/utils';
+import { personaTheme } from '../../constants/themes';
+import { COLORS } from '../../constants/colors';
 import { TrinityCoachSession } from '../../components/social-gyms/TrinityCoachSession';
 
 type Stage = "setup" | "session" | "results";
-
-const TAB_BAR_STYLE = {
-  backgroundColor: '#0f172a',
-  borderTopColor: '#1e293b',
-} as const;
 
 /** Gamification context for the session being played (which skill, at what difficulty). */
 interface GymContext {
@@ -117,20 +115,27 @@ export default function Index() {
   const skipScoring = gamified || isChild;
 
   // Hide the tab bar during session/results so the footer CTA isn't blocked.
+  const theme = personaTheme(user?.persona);
   useEffect(() => {
     const tabNav = navigation.getParent();
     if (!tabNav) return;
+    const tabBarStyle = {
+      backgroundColor: theme.colors.surface,
+      borderTopColor: theme.colors.border,
+    };
     tabNav.setOptions({
-      tabBarStyle: stage === 'setup' ? TAB_BAR_STYLE : { display: 'none' },
+      tabBarStyle: stage === 'setup' ? tabBarStyle : { display: 'none' },
     });
     return () => {
-      tabNav.setOptions({ tabBarStyle: TAB_BAR_STYLE });
+      tabNav.setOptions({ tabBarStyle });
     };
-  }, [stage, navigation]);
+  }, [stage, navigation, theme]);
 
   // Resolve camera + mic permissions up front on the pre-session setup screen
   // so TrinityCoachSession / EmotionPanel mount already granted.
+  // DEMO_MODE never touches mic or camera — no prompts on the pitch device.
   useEffect(() => {
+    if (DEMO_MODE) return;
     if (stage !== 'setup') return;
     if (!cameraPermission) return; // still loading — resolves quickly
     if (!cameraPermission.granted && cameraPermission.canAskAgain) {
@@ -197,7 +202,7 @@ export default function Index() {
 
             {gymLaunch && (
               <View className="mx-6 mt-10 mb-2 flex-row items-center rounded-2xl border border-primary/40 bg-primary/10 px-4 py-3">
-                <Swords size={16} color="#F5A340" />
+                <Swords size={16} color={COLORS.primary} />
                 <Text className="ml-2 flex-1 text-sm text-foreground">
                   {gymLaunch.challenge
                     ? 'Challenge attempt — one shot today. Gold standard unlocks the skill.'

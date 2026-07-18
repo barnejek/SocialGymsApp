@@ -4,6 +4,8 @@ import { CameraView } from 'expo-camera';
 import { FaceTrackerBridge, type FaceTrackerBridgeHandle } from '../FaceTrackerBridge';
 import { useAuth } from '../../components/AuthProvider';
 import type { EmotionMetrics } from '../../lib/emotion';
+import { DEMO_MODE } from '../../lib/utils';
+import { COLORS } from '../../constants/colors';
 
 interface EmotionPanelProps {
   active: boolean;
@@ -18,10 +20,10 @@ interface EmotionPanelProps {
 }
 
 const METRIC_COLORS = {
-  engagement: '#34C759',
-  comfort: '#F5A340',
-  openness: '#3B9EF5',
-  anxiety: '#F87171',
+  engagement: COLORS.engagement,
+  comfort: COLORS.comfort,
+  openness: COLORS.openness,
+  anxiety: COLORS.destructive,
   smiling: '#FBBF24',
 } as const;
 
@@ -116,7 +118,14 @@ export const EmotionPanel = ({
           </>
         ) : (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-muted-foreground text-xs">Camera inactive</Text>
+            <Text className="text-muted-foreground text-xs">
+              {DEMO_MODE ? 'Demo mode' : 'Camera inactive'}
+            </Text>
+            {DEMO_MODE && (
+              <View className="mt-2">
+                <LivePulse active={active} />
+              </View>
+            )}
           </View>
         )}
       </View>

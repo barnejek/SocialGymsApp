@@ -3,6 +3,7 @@ import { View, Text, ScrollView, TouchableOpacity, Animated } from 'react-native
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Quote } from 'lucide-react-native';
 import type { ChatMessage, ScoreResult } from '../../lib/chat';
 import type { Topic } from '../../lib/topics';
+import { COLORS } from '../../constants/colors';
 
 export interface SessionResult {
   topicLabel: string;
@@ -23,9 +24,9 @@ interface Props {
 }
 
 const DIM_COLORS = {
-  engagement: '#34C759',
-  comfort: '#F5A340',
-  openness: '#3B9EF5',
+  engagement: COLORS.engagement,
+  comfort: COLORS.comfort,
+  openness: COLORS.openness,
 } as const;
 
 const band = (score: number) => {
@@ -53,7 +54,7 @@ function useCountUp(value: number, duration = 900) {
 const Delta = ({ from, to }: { from: number; to: number }) => {
   const d = to - from;
   const Icon = d > 2 ? TrendingUp : d < -2 ? TrendingDown : Minus;
-  const color = d > 2 ? '#34C759' : d < -2 ? '#F87171' : '#94a3b8';
+  const color = d > 2 ? COLORS.engagement : d < -2 ? COLORS.destructive : COLORS.mutedForeground;
   const sign = d > 0 ? '+' : '';
   return (
     <View className="flex-row items-center">
@@ -149,24 +150,24 @@ export const Results = ({ result, onTryAnother }: Props) => {
       {/* Golden Rule */}
       <View className="rounded-3xl border border-primary/40 bg-primary/10 p-5 mb-5">
         <View className="flex-row items-center mb-2">
-          <Quote size={14} color="#F5A340" />
+          <Quote size={14} color={COLORS.primary} />
           <Text className="text-[10px] uppercase tracking-wider text-primary ml-1.5">Your golden rule</Text>
         </View>
         <Text className="text-base leading-relaxed text-foreground font-medium">{result.goldenRule}</Text>
       </View>
 
       {/* Coach insights */}
-      <InsightCard label="Coach's read" body={s.coachRead} accent="#94a3b8" />
-      <InsightCard label="What changed" body={s.improvement} accent="#3B9EF5" />
-      <InsightCard label="What you did well" body={s.didWell} accent="#34C759" />
-      <InsightCard label="Try this next time" body={s.tryNext} accent="#F5A340" />
+      <InsightCard label="Coach's read" body={s.coachRead} accent={COLORS.mutedForeground} />
+      <InsightCard label="What changed" body={s.improvement} accent={COLORS.openness} />
+      <InsightCard label="What you did well" body={s.didWell} accent={COLORS.engagement} />
+      <InsightCard label="Try this next time" body={s.tryNext} accent={COLORS.primary} />
 
       <TouchableOpacity
         onPress={onTryAnother}
         className="flex-row items-center justify-center bg-primary rounded-full px-6 py-3.5 mt-3"
         accessibilityLabel="Try another topic"
       >
-        <RefreshCw size={16} color="#0e1424" />
+        <RefreshCw size={16} color={COLORS.primaryForeground} />
         <Text className="text-primary-foreground font-bold ml-2">Try another scenario</Text>
       </TouchableOpacity>
     </ScrollView>

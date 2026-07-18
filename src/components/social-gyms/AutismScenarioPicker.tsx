@@ -5,6 +5,11 @@ import { Button } from '../ui/Button';
 import { topics, type TopicId } from '../../lib/topics';
 import { LESSON_LENGTHS, type LessonLength } from '../../lib/phases';
 import { Coffee, Users, Flame, Megaphone, Check, Clock } from 'lucide-react-native';
+import { personaTheme } from '../../constants/themes';
+
+// This picker only ever renders for the autism persona — use its calm palette
+// for the icon colors that can't take a token class.
+const CALM = personaTheme('b2b_autism_user').colors;
 
 const iconFor = (icon: string) => {
   if (icon === "users") return Users;
@@ -44,23 +49,21 @@ export const AutismScenarioPicker = ({ selected, onSelect, length, onLengthChang
             <Pressable
               key={s.id}
               onPress={() => onSelect(s.id)}
-              style={{
-                width: '48%',
-                aspectRatio: 1,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderRadius: 24,
-                borderWidth: 4,
-                padding: 16,
-                marginBottom: 16,
-                backgroundColor: isSelected ? '#3b82f6' : '#1e293b',
-                borderColor: isSelected ? '#60a5fa' : '#334155'
-              }}
+              style={{ width: '48%', aspectRatio: 1, transform: [{ scale: isSelected ? 1.03 : 1 }] }}
+              className={`items-center justify-center rounded-3xl border-4 p-4 mb-4 ${
+                isSelected ? 'bg-primary border-ring' : 'bg-surface border-border'
+              }`}
             >
+              {/* Selection is never color-only: checkmark badge + slight scale. */}
+              {isSelected && (
+                <View className="absolute top-3 right-3 h-8 w-8 rounded-full bg-background items-center justify-center">
+                  <Check size={20} color={CALM.primary} />
+                </View>
+              )}
               <View className="mb-4">
-                <Icon size={48} color={isSelected ? "#ffffff" : "#94a3b8"} />
+                <Icon size={48} color={isSelected ? '#ffffff' : CALM.mutedForeground} />
               </View>
-              <Text className={`text-center font-bold text-lg ${isSelected ? 'text-white' : 'text-foreground'}`}>
+              <Text className={`text-center font-bold text-lg ${isSelected ? 'text-primary-foreground' : 'text-foreground'}`}>
                 {s.shortLabel}
               </Text>
             </Pressable>
@@ -72,9 +75,9 @@ export const AutismScenarioPicker = ({ selected, onSelect, length, onLengthChang
         <Pressable
           disabled={!selected}
           onPress={onContinue}
-          className={`w-full h-20 rounded-full items-center justify-center ${!selected ? 'opacity-40 bg-muted' : 'bg-green-500'}`}
+          className={`w-full h-20 rounded-full items-center justify-center ${!selected ? 'opacity-40 bg-muted' : 'bg-primary'}`}
         >
-          <Text className="text-2xl font-bold text-white">Start Game!</Text>
+          <Text className="text-2xl font-bold text-primary-foreground">Start Game!</Text>
         </Pressable>
       </View>
     </View>

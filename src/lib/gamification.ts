@@ -10,12 +10,17 @@
 
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Tables } from "../types/supabase";
-import { authStorage } from "./supabaseStorage";
+import { authStorage, envSupabaseAnonKey, envSupabaseUrl } from "./supabaseStorage";
 
-// Publishable project coordinates (safe to embed; RLS + EXECUTE grants are the
-// security boundary, not this key).
-export const SUPABASE_URL = "https://rzplvdxylixgptrjxqdc.supabase.co";
+// Project coordinates come from the platform env (.env: VITE_SUPABASE_URL on
+// web, EXPO_PUBLIC_SUPABASE_URL on mobile — resolved in ./supabaseStorage) and
+// fall back to the hardcoded publishable values so an env mismatch can never
+// point one platform at a different project. Safe to embed; RLS + EXECUTE
+// grants are the security boundary, not this key.
+export const SUPABASE_URL =
+  envSupabaseUrl ?? "https://rzplvdxylixgptrjxqdc.supabase.co";
 export const SUPABASE_ANON_KEY =
+  envSupabaseAnonKey ??
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJ6cGx2ZHh5bGl4Z3B0cmp4cWRjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQzODMxMzAsImV4cCI6MjA5OTk1OTEzMH0.1TGFkDB2CIan3ZF8bWiZ4OcKsfxkkxP1kWxFMCOiJh8";
 
 // ── Row aliases ──────────────────────────────────────────────────────────────
@@ -146,6 +151,12 @@ export async function ensureSignedIn(displayName?: string): Promise<string> {
   if (!userId) {
     const { data, error } = await supabase.auth.signInAnonymously();
     if (error || !data.user) {
+      console.error(
+        "[gamification] supabase.auth.signInAnonymously() failed.",
+        "If the message mentions 'anonymous_provider_disabled' / 'Anonymous sign-ins are disabled',",
+        "enable Anonymous sign-ins in the Supabase dashboard (Authentication → Sign In / Providers).",
+        { url: SUPABASE_URL, status: (error as { status?: number } | null)?.status, error },
+      );
       throw new Error(`Anonymous sign-in failed: ${error?.message ?? "no user"}`);
     }
     userId = data.user.id;
@@ -154,7 +165,21 @@ export async function ensureSignedIn(displayName?: string): Promise<string> {
   const { error: rpcError } = await supabase.rpc("gam_ensure_profile", {
     p_display_name: displayName,
   });
-  if (rpcError) throw new Error(`gam_ensure_profile failed: ${rpcError.message}`);
+  if (rpcError) {
+    console.error(
+      "[gamification] gam_ensure_profile RPC failed.",
+      "A 42501/permission error means the EXECUTE grant or an RLS policy is missing;",
+      "a 42883/does-not-exist error means the gamification migrations haven't been applied.",
+      {
+        url: SUPABASE_URL,
+        message: rpcError.message,
+        code: rpcError.code,
+        details: rpcError.details,
+        hint: rpcError.hint,
+      },
+    );
+    throw new Error(`gam_ensure_profile failed: ${rpcError.message}`);
+  }
 
   return userId;
 }
@@ -164,7 +189,21 @@ export async function fetchGamificationState(): Promise<GamificationState> {
   await ensureSignedIn();
   const supabase = getSupabase();
   const { data, error } = await supabase.rpc("gam_get_state");
-  if (error) throw new Error(`gam_get_state failed: ${error.message}`);
+  if (error) {
+    console.error(
+      "[gamification] gam_get_state RPC failed.",
+      "A 42501/permission error means the EXECUTE grant or an RLS policy is missing;",
+      "a 42883/does-not-exist error means the gamification migrations haven't been applied.",
+      {
+        url: SUPABASE_URL,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      },
+    );
+    throw new Error(`gam_get_state failed: ${error.message}`);
+  }
   return data as unknown as GamificationState;
 }
 

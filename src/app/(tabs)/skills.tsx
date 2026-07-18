@@ -14,6 +14,7 @@ import {
 } from 'lucide-react-native';
 import { MedalRing, RING_COLORS } from '../../components/gym/ProgressRing';
 import { AdultGateModal } from '../../components/gym/AdultGateModal';
+import { COLORS } from '../../constants/colors';
 import { useGamification, progressMapOf } from '../../components/GamificationProvider';
 import {
   canAttempt,
@@ -170,7 +171,7 @@ export default function GymScreen() {
                         : 'bg-surface border-border'
                     } ${locked ? 'opacity-50' : ''}`}
                   >
-                    <Icon size={16} color={active ? '#0e1424' : RING_COLORS.primary} />
+                    <Icon size={16} color={active ? COLORS.primaryForeground : RING_COLORS.primary} />
                     <Text
                       className={`ml-2 text-sm font-semibold ${
                         active ? 'text-primary-foreground' : 'text-foreground'
@@ -195,7 +196,7 @@ export default function GymScreen() {
                     )}
                     {locked && (
                       <View className="ml-2">
-                        <Lock size={12} color="#64748b" />
+                        <Lock size={12} color={COLORS.mutedForeground} />
                       </View>
                     )}
                   </Pressable>
@@ -259,7 +260,7 @@ export default function GymScreen() {
                         >
                           <View className="flex-row items-center">
                             <MedalRing mastery={mastery} size={52} stroke={4}>
-                              {!unlocked && <Lock size={16} color="#64748b" />}
+                              {!unlocked && <Lock size={16} color={COLORS.mutedForeground} />}
                             </MedalRing>
                             <View className="flex-1 ml-4 mr-2">
                               <Text
@@ -282,7 +283,7 @@ export default function GymScreen() {
                                   accessibilityLabel={`Train ${skill.title}`}
                                   className="flex-row items-center bg-primary rounded-full px-4 py-2"
                                 >
-                                  <Play size={13} color="#0e1424" fill="#0e1424" />
+                                  <Play size={13} color={COLORS.primaryForeground} fill={COLORS.primaryForeground} />
                                   <Text className="text-primary-foreground font-bold text-xs ml-1.5">
                                     Train
                                   </Text>
