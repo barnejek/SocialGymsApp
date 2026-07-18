@@ -1,6 +1,3 @@
-/** Set EXPO_PUBLIC_DEMO_MODE=true in .env to run a fully scripted pitch demo. No WiFi or Gemini quota needed. */
-export const DEMO_MODE = process.env.EXPO_PUBLIC_DEMO_MODE === 'true';
-
 type ClassValue = string | number | null | undefined | false | ClassValue[];
 
 // Lightweight className combiner for NativeWind.
