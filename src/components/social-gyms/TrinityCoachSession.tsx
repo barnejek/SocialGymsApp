@@ -38,7 +38,7 @@ import {
   type TrinityPhase,
   type LessonLength,
 } from '../../lib/phases';
-import type { Topic } from '../../lib/topics';
+import { applyDifficulty, type DifficultyLevel, type Topic } from '../../lib/topics';
 
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? 'dummy-key-for-now';
 
@@ -57,6 +57,14 @@ interface Props {
   active: boolean;
   cameraGranted: boolean;
   onComplete: (r: SessionResult) => void;
+  /** Gamification persona-hardening: appended to every phase system prompt. */
+  difficulty?: DifficultyLevel;
+  /**
+   * Gym sessions skip the in-component score-conversation call — the parent
+   * sends both attempts to complete-session, which grades once AND applies
+   * rewards server-side (avoids double-grading the same transcripts).
+   */
+  skipScoring?: boolean;
 }
 
 const SPEAKER_META: Record<string, { name: string; color: string }> = {
@@ -66,7 +74,15 @@ const SPEAKER_META: Record<string, { name: string; color: string }> = {
   you: { name: 'You', color: '#F5A340' },
 };
 
-export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted, onComplete }: Props) => {
+export const TrinityCoachSession = ({
+  topic,
+  lessonLength,
+  active,
+  cameraGranted,
+  onComplete,
+  difficulty = 'base',
+  skipScoring = false,
+}: Props) => {
   const { user } = useAuth();
   const gemini = useGeminiLive(GEMINI_API_KEY);
 
@@ -95,6 +111,8 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
 
   const topicRef = useRef(topic);
   useEffect(() => { topicRef.current = topic; }, [topic]);
+  const difficultyRef = useRef(difficulty);
+  useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
   const faceMetricsRef = useRef(faceMetrics);
   useEffect(() => { faceMetricsRef.current = faceMetrics; }, [faceMetrics]);
 
@@ -137,7 +155,10 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
       setPhase(next);
       if (next === 'scoring') return;
 
-      const systemPrompt = withGuardrails(trinityPrompt(next, buildCtx()));
+      const systemPrompt = applyDifficulty(
+        withGuardrails(trinityPrompt(next, buildCtx())),
+        difficultyRef.current,
+      );
       await geminiRef.current.updateSystemPrompt(systemPrompt);
 
       const t1 = () =>
@@ -200,7 +221,10 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
     (async () => {
       try {
         await geminiRef.current.connect(
-          withGuardrails(trinityPrompt('phase-1-setup', buildCtx())),
+          applyDifficulty(
+            withGuardrails(trinityPrompt('phase-1-setup', buildCtx())),
+            difficultyRef.current,
+          ),
         );
         setTimeout(() => geminiRef.current.sendText('Begin the setup now.'), 400);
       } catch (e) {
@@ -220,6 +244,7 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
 
   useEffect(() => {
     if (phase !== 'phase-6-final') return;
+    if (skipScoring) return; // the parent grades via complete-session instead
     if (earlyScoreStartedRef.current) return;
     earlyScoreStartedRef.current = true;
 
@@ -244,8 +269,10 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
     finalizeRanRef.current = true;
     setPhase('scoring');
 
+    // Use cached result if scoring already finished, otherwise await it now.
+    // Gym sessions (skipScoring) leave scoring at the fallback; complete-session grades.
     let scoring: ScoreResult | null = earlyScoreRef.current;
-    if (!scoring) {
+    if (!scoring && !skipScoring) {
       try {
         scoring = await scoreConversation({
           topicLabel: topicRef.current.label,
@@ -268,14 +295,23 @@ export const TrinityCoachSession = ({ topic, lessonLength, active, cameraGranted
 
     const result: SessionResult = {
       topicLabel: topicRef.current.label,
+      topic: topicRef.current,
+      scenario: scenarioRef.current,
+      attempt1: attempt1Ref.current,
+      attempt2: attempt2Ref.current,
       scoring: scoring ?? FALLBACK_SCORE,
+      presence: {
+        engagement: fusedRef.current.engagement,
+        comfort: 100 - fusedRef.current.anxiety,
+        openness: fusedRef.current.smiling,
+      },
       goldenRule:
         goldenRuleRef.current ??
         'Practice one deliberate social rep this week — same scene, one clearer move.',
     };
     setPendingResult(result);
     setSessionComplete(true);
-  }, []);
+  }, [skipScoring]);
 
   const lastSeenRef = useRef(0);
   useEffect(() => {

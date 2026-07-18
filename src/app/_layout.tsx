@@ -2,6 +2,7 @@ import '../global.css';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { AuthProvider, useAuth } from '../components/AuthProvider';
+import { GamificationProvider } from '../components/GamificationProvider';
 import { useEffect } from 'react';
 
 function RootLayoutNav() {
@@ -31,7 +32,10 @@ export default function RootLayout() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <AuthProvider>
-        <RootLayoutNav />
+        {/* Bootstraps the anonymous Supabase identity on app start. */}
+        <GamificationProvider>
+          <RootLayoutNav />
+        </GamificationProvider>
       </AuthProvider>
     </GestureHandlerRootView>
   );

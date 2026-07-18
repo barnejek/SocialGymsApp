@@ -312,34 +312,3 @@ export function presenceRating(
     openness: avg((s) => s.openness),
   };
 }
-
-// ── DEPRECATED legacy mock (mobile dashboard/train still import these; they
-// are deleted in the Prompt 4 UI rebuild — do not use in new code) ───────────
-
-export interface GamificationStats {
-  streakDays: number;
-  totalSessions: number;
-  presenceScore: number;
-  lastSessionDate: string | null;
-  weeklyGoalProgress: number;
-}
-
-/** @deprecated fake stats — replaced by fetchGamificationState() */
-export let currentStats: GamificationStats = {
-  streakDays: 4,
-  totalSessions: 12,
-  presenceScore: 82,
-  lastSessionDate: new Date().toISOString(),
-  weeklyGoalProgress: 3,
-};
-
-/** @deprecated fake logic — replaced by completeSession() */
-export function recordSessionComplete(presenceScore: number) {
-  currentStats.totalSessions += 1;
-  currentStats.weeklyGoalProgress = Math.min(5, currentStats.weeklyGoalProgress + 1);
-  currentStats.presenceScore = Math.round(
-    currentStats.presenceScore * 0.8 + presenceScore * 0.2,
-  );
-  currentStats.lastSessionDate = new Date().toISOString();
-  return currentStats;
-}

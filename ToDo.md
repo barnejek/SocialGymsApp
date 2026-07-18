@@ -55,7 +55,7 @@ Add a `DEMO_MODE` flag that plays back a **scripted session**: a pre-written tra
 - 🟢 Persist last persona (AsyncStorage) and skip login on relaunch.
 
 ### B2C Dashboard (`dashboard.tsx`)
-- 🟡 Streak logic is fake: `streakDays` never derives from `lastSessionDate`. Compute it, and make `recordSessionComplete` bump it — then do a live session in the demo and watch the streak tick up on stage.
+- ✅ ~~Streak logic is fake~~ — replaced by real Supabase stats (streak, level + XP ring, Reps, daily quests, Presence rings) in the gamification build (July 2026). Fake `currentStats`/`recordSessionComplete` deleted from `lib/gamification.ts`.
 - 🟡 "3 scenarios recommended for you" is static — pick 3 topics the user hasn't trained recently and deep-link each one into `train` with the topic pre-selected (real personalization, cheap to mock).
 - 🟡 Presence Score should visibly react to the just-finished session (the `recordSessionComplete` rolling average already does this — surface a "+2 since yesterday" delta chip).
 - 🟢 *(Public-speaking coach hat)* add micro-metrics that practitioners actually track: filler-word count, words-per-minute, average pause length. Even mocked, these make the product credible to anyone who has done speech coaching.
@@ -91,7 +91,7 @@ Add a `DEMO_MODE` flag that plays back a **scripted session**: a pre-written tra
 - 🟡 Push a real entry from `recordSessionComplete` into the (in-memory) history list so a live demo session shows up at the top, then the static mock entries below. "What you just did is already in your history" lands well.
 
 ### Skills tree (`skills.tsx`)
-- 🟢 Tree is fully hardcoded and disconnected from topics/sessions. Map nodes to `TopicId`s, unlock tiers from `totalSessions`, navigate to `train` with the topic preselected on tap of an unlocked node.
+- ✅ ~~Tree is fully hardcoded~~ — rebuilt as the data-driven Gym (July 2026): 4 paths from `gam_paths`/`gam_skills`, tier unlock + daily challenge rules, mastery medal rings, Romance 18+ attestation, tap-to-train with the mastery-appropriate difficulty modifier.
 
 ### Cross-cutting
 - 🟡 "Eye Contact" in `EmotionPanel` displays the *engagement* score — mislabeled (and we don't track gaze). Rename to "Attention" or compute nothing and mark it roadmap.

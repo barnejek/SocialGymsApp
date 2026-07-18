@@ -1,11 +1,19 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Quote } from 'lucide-react-native';
-import type { ScoreResult } from '../../lib/chat';
+import type { ChatMessage, ScoreResult } from '../../lib/chat';
+import type { Topic } from '../../lib/topics';
 
 export interface SessionResult {
   topicLabel: string;
+  topic: Topic;
+  /** The concrete scenario the coach invented in Phase 1. */
+  scenario: string;
+  attempt1: ChatMessage[];
+  attempt2: ChatMessage[];
   scoring: ScoreResult;
+  /** Live multimodal read (0-100) captured during the session. */
+  presence: { engagement: number; comfort: number; openness: number };
   goldenRule: string;
 }
 
