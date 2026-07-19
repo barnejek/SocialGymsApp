@@ -72,7 +72,8 @@ const faceApiHtml = `
       if (!modelsReady) return;
       if (typeof data !== 'string' || !data.startsWith('data:image')) return;
       const img = document.getElementById('image');
-      img.src = data;
+      // Attach the handler BEFORE setting src — a cached data-URL can fire
+      // 'load' synchronously, which would silently drop the frame otherwise.
       img.onload = async () => {
         // inputSize 224 (default 416) ≈ 3–4× less compute per detection — the
         // same tuning the web hook uses; the WebView runs on weaker hardware.
