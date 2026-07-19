@@ -62,11 +62,6 @@ export default function GymScreen() {
     [state?.paths],
   );
 
-  const foundationsBronzes = (state?.skills ?? []).filter(
-    (s) => s.path_id === 'foundations' && (progress[s.id]?.mastery ?? 0) >= 1,
-  ).length;
-  const pathsOpen = foundationsBronzes >= 2;
-
   const tiers = useMemo(() => {
     const skills = (state?.skills ?? [])
       .filter((s) => s.path_id === selectedPathId)
@@ -128,15 +123,6 @@ export default function GymScreen() {
         <View className="px-6 pt-6 mb-5">
           <Text className="text-[11px] uppercase tracking-[3px] text-primary">The Gym</Text>
           <Text className="text-3xl font-bold text-foreground mt-1">Pick your path</Text>
-          {!pathsOpen && !loading && state && (
-            <Text className="text-sm text-muted-foreground mt-2">
-              Earn Bronze on{' '}
-              {2 - foundationsBronzes === 1
-                ? 'one more Foundations skill'
-                : 'two Foundations skills'}{' '}
-              to open every path.
-            </Text>
-          )}
         </View>
 
         {/* ── Path switcher chips ─────────────────────────────────────────── */}
@@ -156,20 +142,19 @@ export default function GymScreen() {
               ))
             : paths.map((path) => {
                 const Icon = PATH_ICONS[path.icon] ?? Sparkles;
-                const locked = path.id !== 'foundations' && !pathsOpen;
                 const active = path.id === selectedPathId;
                 const pct = masteredPct(path.id);
                 return (
                   <Pressable
                     key={path.id}
-                    onPress={() => !locked && selectPath(path.id, path.requires_adult)}
+                    onPress={() => selectPath(path.id, path.requires_adult)}
                     accessibilityRole="button"
-                    accessibilityLabel={`${path.title}${locked ? ', locked' : `, ${pct}% mastered`}`}
+                    accessibilityLabel={`${path.title}, ${pct}% mastered`}
                     className={`flex-row items-center rounded-full border px-4 py-2.5 ${
                       active
                         ? 'bg-primary border-primary'
                         : 'bg-surface border-border'
-                    } ${locked ? 'opacity-50' : ''}`}
+                    }`}
                   >
                     <Icon size={16} color={active ? COLORS.primaryForeground : RING_COLORS.primary} />
                     <Text
@@ -192,11 +177,6 @@ export default function GymScreen() {
                         >
                           18+
                         </Text>
-                      </View>
-                    )}
-                    {locked && (
-                      <View className="ml-2">
-                        <Lock size={12} color={COLORS.mutedForeground} />
                       </View>
                     )}
                   </Pressable>

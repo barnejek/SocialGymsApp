@@ -267,8 +267,9 @@ export const toProgressMap = (rows: SkillProgress[]): Record<string, SkillProgre
 
 /**
  * Unlock rules (mirror of gam_is_skill_unlocked in Postgres):
- * Foundations T1 is free; 2 Foundations Bronzes open all paths; tier N opens
- * when any same-path tier N-1 skill is Bronze+; mastery>0 = already unlocked.
+ * every path's tier 1 is free from the start; tier N opens when any same-path
+ * tier N-1 skill is Bronze+; mastery>0 = already unlocked. (Romance's adult
+ * gate is enforced separately in canAttempt.)
  */
 export function isSkillUnlocked(
   skill: Pick<SkillDef, "id" | "path_id" | "tier">,
@@ -276,23 +277,13 @@ export function isSkillUnlocked(
   progress: ProgressMap,
 ): boolean {
   if ((progress[skill.id]?.mastery ?? 0) > 0) return true;
-  if (skill.path_id === "foundations" && skill.tier === 1) return true;
+  if (skill.tier === 1) return true;
 
-  const foundationsBronzes = skills.filter(
-    (s) => s.path_id === "foundations" && (progress[s.id]?.mastery ?? 0) >= 1,
-  ).length;
-  const pathsOpen = foundationsBronzes >= 2;
-
-  if (skill.tier === 1) return pathsOpen;
-
-  return (
-    (skill.path_id === "foundations" || pathsOpen) &&
-    skills.some(
-      (s) =>
-        s.path_id === skill.path_id &&
-        s.tier === skill.tier - 1 &&
-        (progress[s.id]?.mastery ?? 0) >= 1,
-    )
+  return skills.some(
+    (s) =>
+      s.path_id === skill.path_id &&
+      s.tier === skill.tier - 1 &&
+      (progress[s.id]?.mastery ?? 0) >= 1,
   );
 }
 

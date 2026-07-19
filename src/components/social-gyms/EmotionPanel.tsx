@@ -126,6 +126,8 @@ export const EmotionPanel = ({
               ref={cameraRef}
               style={[StyleSheet.absoluteFill, { transform: [{ scaleX: -1 }] }]}
               facing="front"
+              animateShutter={false}
+              mute
               onCameraReady={onCameraReady}
             />
             <FaceTrackerBridge

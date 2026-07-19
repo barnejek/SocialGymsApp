@@ -322,6 +322,16 @@ export const TrinityCoachSession = ({
   const timer = useSessionTimer(timerDuration, timed, handleTimerEnd);
 
   const startedRef = useRef(false);
+  // Latest builders behind refs: `withGuardrails` changes identity whenever the
+  // auth provider re-resolves `user`. With those functions in the deps array,
+  // that re-run's CLEANUP called gemini.disconnect() while `startedRef` blocked
+  // a reconnect — the coach died seconds after connecting. The effect must run
+  // on `active` transitions only.
+  const buildCtxRef = useRef(buildCtx);
+  useEffect(() => { buildCtxRef.current = buildCtx; }, [buildCtx]);
+  const withGuardrailsRef = useRef(withGuardrails);
+  useEffect(() => { withGuardrailsRef.current = withGuardrails; }, [withGuardrails]);
+
   useEffect(() => {
     if (!active || startedRef.current) return;
     startedRef.current = true;
@@ -337,7 +347,7 @@ export const TrinityCoachSession = ({
       try {
         await geminiRef.current.connect(
           applyDifficulty(
-            withGuardrails(trinityPrompt('phase-1-setup', buildCtx())),
+            withGuardrailsRef.current(trinityPrompt('phase-1-setup', buildCtxRef.current())),
             difficultyRef.current,
           ),
         );
@@ -351,7 +361,7 @@ export const TrinityCoachSession = ({
     return () => {
       geminiRef.current.disconnect();
     };
-  }, [active, buildCtx, withGuardrails]);
+  }, [active]);
 
   const finalizeRanRef = useRef(false);
   const goldenRuleRef = useRef<string | null>(null);

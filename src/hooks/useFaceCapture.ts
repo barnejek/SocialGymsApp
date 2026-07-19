@@ -51,6 +51,11 @@ export function useFaceCapture({
         const photo = await cameraRef.current?.takePictureAsync({
           quality: 0.1,
           base64: true,
+          // Silent, invisible capture: this fires every ~3s during a session —
+          // without these flags Android plays the shutter sound and the
+          // preview "flashes" on every frame grab.
+          shutterSound: false,
+          skipProcessing: true,
         });
 
         if (photo?.base64 && bridgeRef.current) {
