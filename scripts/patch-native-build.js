@@ -57,7 +57,24 @@ patch('node_modules/react-native-audio-api/android/build.gradle', (s) => {
   return s;
 });
 
-// ---- 2b) react-native-audio-api download script: PATH fix + unzip fallback ----
+// ---- 2b) react-native-audio-api: short CMake staging dir (Windows MAX_PATH) ----
+// Object paths mirror the full source path under node_modules and exceed 260 chars
+// (worst case was 337). A short staging dir brings the worst case down to ~254.
+patch('node_modules/react-native-audio-api/android/build.gradle', (s) => {
+  if (s.includes('buildStagingDirectory')) return s;
+  return s.replace(
+    '  externalNativeBuild {\n    cmake {\n      path "CMakeLists.txt"\n    }\n  }',
+    '  externalNativeBuild {\n    cmake {\n      path "CMakeLists.txt"\n' +
+      '      // Patched: Windows MAX_PATH workaround — object paths mirror the full source path\n' +
+      '      // under node_modules and exceed the 260-char limit. Use a very short staging dir.\n' +
+      '      if (Os.isFamily(Os.FAMILY_WINDOWS)) {\n' +
+      '        buildStagingDirectory "C:/.rnaa"\n' +
+      '      }\n' +
+      '    }\n  }'
+  );
+});
+
+// ---- 2c) react-native-audio-api download script: PATH fix + unzip fallback ----
 patch('node_modules/react-native-audio-api/scripts/download-prebuilt-binaries.sh', (s) => {
   if (s.includes('extract_zip')) return s;
   s = s.replace(
