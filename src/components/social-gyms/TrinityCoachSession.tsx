@@ -364,6 +364,27 @@ export const TrinityCoachSession = ({
   }, [active]);
 
   const finalizeRanRef = useRef(false);
+
+  // Surface connection loss mid-session. openWs "succeeds" on an 800 ms
+  // fallback even when the server later rejects the setup (bad key/model close
+  // codes 1007/1008), so the connect() catch alone can't see those failures —
+  // watch the status instead. Cleared automatically on silent recovery.
+  useEffect(() => {
+    const s = gemini.status.value;
+    if (s === 'connected') {
+      setEngineError(null);
+    } else if (
+      s === 'disconnected' &&
+      startedRef.current &&
+      !sessionComplete &&
+      !finalizeRanRef.current &&
+      phaseRef.current !== 'scoring'
+    ) {
+      setEngineError(
+        'Lost the connection to your coach — check your network and API key. The session clock keeps running, but voice is down.',
+      );
+    }
+  }, [gemini.status, sessionComplete]);
   const goldenRuleRef = useRef<string | null>(null);
   const earlyScoreRef = useRef<ScoreResult | null>(null);
   const earlyScoreStartedRef = useRef(false);

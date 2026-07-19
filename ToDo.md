@@ -6,6 +6,14 @@
 
 ---
 
+## 1a-bis. Fixed in the live-engine debug pass (2026-07-19, evening)
+
+- **THE "no voice, no text" bug**: Gemini Live sends its JSON wrapped in **binary** WebSocket frames. RN delivered them as Blobs and the hook's `String(evt.data)` coercion produced `"[object Blob]"` → `JSON.parse` threw → every server message (setupComplete, audio, transcripts) was silently dropped, while timers and phase caps kept the UI moving. Fixed: `ws.binaryType = "arraybuffer"` + `Buffer` decode in `useGeminiLive` (the web hook already handled Blob frames — this was the missing port).
+- **PCM decode alignment**: `Buffer.from(base64)` can return a view at an odd `byteOffset`; constructing `Int16Array` on it throws a RangeError that the ws try/catch swallowed (dropped audio frames). Rewritten as an alignment-safe byte-wise decode.
+- **Stale session on re-entry**: tab screens stay mounted in expo-router, so leaving mid-session and coming back showed the old conversation. `train.tsx` now resets to the picker on the navigation `blur` event, which unmounts `TrinityCoachSession` → disconnects Gemini, stops mic/camera, clears gym deep-link params.
+- **Silent connection failures surfaced**: `connect()` now throws when the socket never opens, and the session screen watches `gemini.status` — a mid-session drop (incl. server setup rejections after the 800 ms fallback resolve) shows the error banner instead of a dead coach.
+- **Web repo (same pass)**: `disconnect()` now hard-stops all scheduled audio buffer sources — previously the coach kept talking for seconds after leaving the session because queued audio on the shared AudioContext was never stopped.
+
 ## 1a. Fixed in the full-stack audit pass (2026-07-19)
 
 - **DEMO_MODE fully removed (post-pitch)**: scripted engine in `useGeminiLive`, fake metrics timeline in `useFaceCapture`, `DEMO_SCRIPT`/`demoMetricsAt` in `mockBackend.ts`, `DEMO_SCORE` in `chat.ts`, the `EXPO_PUBLIC_DEMO_MODE` flag and all UI branches. The app now always runs the live engine (dev client required — `npx expo run:android` / `run:ios`, NOT Expo Go).

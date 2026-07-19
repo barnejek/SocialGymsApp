@@ -42,10 +42,17 @@ const PLAYBACK_SAMPLE_RATE = 24000;
 
 function decodePcm16ToFloat32(b64: string): Float32Array {
   const bin = Buffer.from(b64, "base64");
-  const evenLength = bin.length - (bin.length % 2);
-  const pcm = new Int16Array(bin.buffer, bin.byteOffset, evenLength / 2);
-  const f32 = new Float32Array(pcm.length);
-  for (let i = 0; i < pcm.length; i++) f32[i] = pcm[i] / 32768;
+  // Byte-wise decode: Buffer.from() often returns a view at an ODD byteOffset
+  // into a shared pool, and `new Int16Array(buffer, oddOffset, …)` throws a
+  // RangeError — which the ws message try/catch would swallow, silently
+  // dropping audio frames.
+  const samples = (bin.length - (bin.length % 2)) / 2;
+  const f32 = new Float32Array(samples);
+  for (let i = 0; i < samples; i++) {
+    let v = bin[2 * i] | (bin[2 * i + 1] << 8);
+    if (v >= 0x8000) v -= 0x10000;
+    f32[i] = v / 32768;
+  }
   return f32;
 }
 
@@ -135,6 +142,12 @@ export function useGeminiLive(apiKey: string) {
         currentUserTranscriptRef.current = "";
 
         const ws = new WebSocket(`${WS_BASE}?key=${apiKey}`);
+        // Gemini wraps its JSON in BINARY WebSocket frames. Without this, RN
+        // delivers them as Blob objects; the old `String(evt.data)` coercion
+        // produced "[object Blob]", JSON.parse threw, and EVERY server message
+        // (setupComplete, audio, transcripts) was silently dropped — a session
+        // with a running timer but a mute, textless coach.
+        ws.binaryType = "arraybuffer";
         wsRef.current = ws;
         wsTargetRef.current = ws;
 
@@ -179,7 +192,10 @@ export function useGeminiLive(apiKey: string) {
 
         ws.onmessage = (evt) => {
           try {
-            const text = typeof evt.data === "string" ? evt.data : String(evt.data);
+            const text =
+              typeof evt.data === "string"
+                ? evt.data
+                : Buffer.from(evt.data as ArrayBuffer).toString("utf8");
             const data = JSON.parse(text);
             reconnectAttemptsRef.current = 0;
             // Explicit setup ack → safe to start streaming mic audio now.
@@ -337,7 +353,9 @@ export function useGeminiLive(apiKey: string) {
       scheduleEndRef.current = 0;
 
       const ws = await openWs(systemPrompt);
-      if (!ws) return;
+      // Throw instead of returning silently so the session UI can surface the
+      // failure (engine error banner) rather than showing a dead coach.
+      if (!ws) throw new Error("Gemini Live connection failed");
       await setupMic(ws);
     },
     [openWs, setupMic]

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { ScrollView, View, BackHandler, TouchableOpacity, Text } from 'react-native';
 import { useCameraPermissions } from 'expo-camera';
 import { requestRecordingPermissionsAsync } from 'expo-audio';
@@ -77,6 +77,7 @@ export default function Index() {
     if (gymLaunch) setTopicId(gymLaunch.topicId);
   }, [gymLaunch]);
 
+  const clearGymParamsRef = useRef<() => void>(() => {});
   const clearGymParams = () => {
     if (gymLaunch) {
       router.setParams({
@@ -88,6 +89,7 @@ export default function Index() {
       } as never);
     }
   };
+  useEffect(() => { clearGymParamsRef.current = clearGymParams; });
 
   // Resolve the gamification context for the CURRENT selection: an explicit gym
   // launch wins; otherwise b2c picker topics map to their gym skill so ordinary
@@ -151,6 +153,23 @@ export default function Index() {
     clearGymParams();
     setStage('setup');
   };
+
+  // Kill the session when the user navigates away (tab switch, deep link,
+  // hardware back to another screen). Tab screens stay MOUNTED in expo-router,
+  // so without this the old conversation was still sitting in `stage:
+  // 'session'` when you came back to start a different one. Resetting to
+  // 'setup' unmounts TrinityCoachSession, whose cleanup disconnects Gemini and
+  // stops the mic/camera loops.
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('blur', () => {
+      setStage('setup');
+      setResult(null);
+      // Via ref — the listener registers once, and a directly captured
+      // clearGymParams would be a stale first-render closure (gymLaunch null).
+      clearGymParamsRef.current();
+    });
+    return unsubscribe;
+  }, [navigation]);
 
   useEffect(() => {
     const backAction = () => {
