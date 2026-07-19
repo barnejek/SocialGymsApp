@@ -40,11 +40,10 @@ import {
 } from '../../lib/phases';
 import { fetchGroundedTechnique } from '../../lib/rag';
 import { applyDifficulty, type DifficultyLevel, type Topic } from '../../lib/topics';
-import { DEMO_MODE } from '../../lib/utils';
 import { COLORS } from '../../constants/colors';
 
 // No dummy fallback: a missing key must be visible, not silently produce a
-// dead WebSocket. DEMO_MODE runs without any key.
+// dead WebSocket.
 const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
 const FALLBACK_SCORE: ScoreResult = {
@@ -246,9 +245,9 @@ export const TrinityCoachSession = ({
     if (!active || startedRef.current) return;
     startedRef.current = true;
 
-    if (!DEMO_MODE && !GEMINI_API_KEY) {
+    if (!GEMINI_API_KEY) {
       setEngineError(
-        'No Gemini API key configured — the live coach can’t connect. Set EXPO_PUBLIC_GEMINI_API_KEY in .env (or EXPO_PUBLIC_DEMO_MODE=true for the scripted demo) and restart.',
+        'No Gemini API key configured — the live coach can’t connect. Set EXPO_PUBLIC_GEMINI_API_KEY in .env and restart.',
       );
       return;
     }

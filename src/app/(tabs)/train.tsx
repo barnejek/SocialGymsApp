@@ -21,7 +21,6 @@ import {
   type TopicId,
 } from '../../lib/topics';
 import { DEFAULT_LESSON_LENGTH, type LessonLength } from '../../lib/phases';
-import { DEMO_MODE } from '../../lib/utils';
 import { personaTheme } from '../../constants/themes';
 import { COLORS } from '../../constants/colors';
 import { TrinityCoachSession } from '../../components/social-gyms/TrinityCoachSession';
@@ -133,9 +132,7 @@ export default function Index() {
 
   // Resolve camera + mic permissions up front on the pre-session setup screen
   // so TrinityCoachSession / EmotionPanel mount already granted.
-  // DEMO_MODE never touches mic or camera — no prompts on the pitch device.
   useEffect(() => {
-    if (DEMO_MODE) return;
     if (stage !== 'setup') return;
     if (!cameraPermission) return; // still loading — resolves quickly
     if (!cameraPermission.granted && cameraPermission.canAskAgain) {

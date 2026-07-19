@@ -8,7 +8,8 @@
 
 ## 1a. Fixed in the full-stack audit pass (2026-07-19)
 
-- **Env/config**: removed the `'dummy-key-for-now'` Gemini fallback; a missing `EXPO_PUBLIC_GEMINI_API_KEY` (or a failed connect) now shows a visible error banner in the session screen. `.env` gained the missing `EXPO_PUBLIC_GEMINI_API_KEY` + `EXPO_PUBLIC_DEMO_MODE=true` entries (demo on until a key is filled in).
+- **DEMO_MODE fully removed (post-pitch)**: scripted engine in `useGeminiLive`, fake metrics timeline in `useFaceCapture`, `DEMO_SCRIPT`/`demoMetricsAt` in `mockBackend.ts`, `DEMO_SCORE` in `chat.ts`, the `EXPO_PUBLIC_DEMO_MODE` flag and all UI branches. The app now always runs the live engine (dev client required — `npx expo run:android` / `run:ios`, NOT Expo Go).
+- **Env/config**: removed the `'dummy-key-for-now'` Gemini fallback; a missing `EXPO_PUBLIC_GEMINI_API_KEY` (or a failed connect) now shows a visible error banner in the session screen. `.env` now carries the real client-side Gemini key (same as web's `VITE_GEMINI_API_KEY`).
 - **Env naming**: `chat.ts` / `supabaseStorage.ts` now accept `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` *or* `_ANON_KEY` (matching `rag.ts` and the web repo); killed the `b2b-placeholder-url` fallback — missing env now fails loudly.
 - **Child metric hiding (the §3 ✅ that wasn't)**: `EmotionPanel` now takes `phase`; numeric gauges are force-hidden during rehearsal rounds (web parity, Clark & Wells) and hidden *entirely* for the `b2b_autism_user` persona — the child sees a friendly line instead.
 - **"Openness" mislabel**: the panel showed `confidence` as Openness while scoring uses `smiling` as openness. Rows now match the web panel: Confidence / Engagement / Smiling / Anxiety.

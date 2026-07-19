@@ -5,7 +5,6 @@ import { FaceTrackerBridge, type FaceTrackerBridgeHandle } from '../FaceTrackerB
 import { useAuth } from '../../components/AuthProvider';
 import type { EmotionMetrics } from '../../lib/emotion';
 import { isTimedPhase, type TrinityPhase } from '../../lib/phases';
-import { DEMO_MODE } from '../../lib/utils';
 import { COLORS } from '../../constants/colors';
 
 interface EmotionPanelProps {
@@ -148,14 +147,7 @@ export const EmotionPanel = ({
           </>
         ) : (
           <View className="flex-1 items-center justify-center">
-            <Text className="text-muted-foreground text-xs">
-              {DEMO_MODE ? 'Demo mode' : 'Camera inactive'}
-            </Text>
-            {DEMO_MODE && (
-              <View className="mt-2">
-                <LivePulse active={active} />
-              </View>
-            )}
+            <Text className="text-muted-foreground text-xs">Camera inactive</Text>
           </View>
         )}
       </View>
