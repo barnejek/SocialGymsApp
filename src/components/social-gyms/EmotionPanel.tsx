@@ -26,6 +26,28 @@ interface EmotionPanelProps {
   onCameraReady: () => void;
 }
 
+/**
+ * Pick the smallest supported picture size that's still big enough for
+ * detection (face-api runs TinyFaceDetector at inputSize 224). Full-res
+ * snapshots were the P1 cost: every ~3 s tick pushed a multi-MB base64 JPEG
+ * over the RN→WebView bridge. iOS may return non-"WxH" preset names — those
+ * are skipped, and if nothing parses we keep the platform default.
+ */
+const MIN_LONG_EDGE = 320;
+function pickSnapshotSize(sizes: string[]): string | undefined {
+  let best: { size: string; area: number } | undefined;
+  for (const size of sizes) {
+    const match = /^(\d+)x(\d+)$/.exec(size);
+    if (!match) continue;
+    const w = Number(match[1]);
+    const h = Number(match[2]);
+    if (Math.max(w, h) < MIN_LONG_EDGE) continue;
+    const area = w * h;
+    if (!best || area < best.area) best = { size, area };
+  }
+  return best?.size;
+}
+
 const METRIC_COLORS = {
   engagement: COLORS.engagement,
   confidence: COLORS.comfort,
@@ -98,6 +120,29 @@ export const EmotionPanel = ({
   const { user } = useAuth();
   const [faceError, setFaceError] = useState(false);
 
+  // Real snapshot downscaling (ToDo-stack P1): once the camera is ready, ask
+  // the device for its supported sizes and switch to the smallest usable one.
+  // Undefined until then — the first frame or two may be full-res, which the
+  // pipeline already tolerates.
+  const [pictureSize, setPictureSize] = useState<string | undefined>(undefined);
+  const sizeQueriedRef = useRef(false);
+  const handleCameraReady = () => {
+    onCameraReady();
+    if (sizeQueriedRef.current) return;
+    sizeQueriedRef.current = true;
+    void (async () => {
+      try {
+        const sizes = await cameraRef.current?.getAvailablePictureSizesAsync();
+        if (sizes && sizes.length > 0) {
+          const size = pickSnapshotSize(sizes);
+          if (size) setPictureSize(size);
+        }
+      } catch {
+        // Keep the platform default — worse payloads, but capture still works.
+      }
+    })();
+  };
+
   const showCamera = active && cameraGranted;
 
   // Child (autism) persona NEVER sees numeric metrics — percentages and
@@ -128,7 +173,8 @@ export const EmotionPanel = ({
               facing="front"
               animateShutter={false}
               mute
-              onCameraReady={onCameraReady}
+              pictureSize={pictureSize}
+              onCameraReady={handleCameraReady}
             />
             <FaceTrackerBridge
               ref={bridgeRef}

@@ -54,7 +54,8 @@
     "android": "expo run:android",
     "ios": "expo run:ios",
     "web": "expo start --web",
-    "lint": "expo lint"
+    "lint": "expo lint",
+    "generate:faceapi": "node ./scripts/generate-faceapi-assets.cjs"
   },
   "private": true
 }

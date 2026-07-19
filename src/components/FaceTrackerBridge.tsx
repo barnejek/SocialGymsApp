@@ -2,6 +2,13 @@ import React, { forwardRef, useImperativeHandle, useRef, useState } from 'react'
 import { View, StyleSheet } from 'react-native';
 import { WebView } from 'react-native-webview';
 import type { EmotionMetrics } from '../lib/emotion';
+import {
+  FACE_API_SOURCE,
+  TINY_FACE_DETECTOR_WEIGHT_SPECS,
+  TINY_FACE_DETECTOR_WEIGHTS_B64,
+  FACE_EXPRESSION_WEIGHT_SPECS,
+  FACE_EXPRESSION_WEIGHTS_B64,
+} from '../generated/faceApiAssets';
 
 export interface FaceTrackerBridgeHandle {
   postMessage: (data: string) => void;
@@ -10,39 +17,56 @@ export interface FaceTrackerBridgeHandle {
 interface FaceTrackerBridgeProps {
   onMetrics: (metrics: EmotionMetrics) => void;
   enabled: boolean;
-  /** Fired when face-api / its models fail to load (offline, CDN down, timeout). */
+  /** Fired when face-api or its bundled models fail to initialize (timeout / broken bundle). */
   onError?: () => void;
 }
 
+// Everything the WebView needs is inlined below — the face-api.js script AND
+// the model weights (src/generated/faceApiAssets.ts, built by
+// scripts/generate-faceapi-assets.cjs). Face tracking therefore works fully
+// offline: the old runtime dependency on vladmandic.github.io (script + model
+// fetch — the "conference-WiFi time bomb", ToDo-stack P1) is gone.
 const faceApiHtml = `
 <!DOCTYPE html>
 <html>
 <head>
-  <script src="https://vladmandic.github.io/face-api/dist/face-api.js"></script>
   <style> body { margin: 0; padding: 0; background: transparent; } </style>
 </head>
 <body>
   <img id="image" style="display:none;" />
+  <script>${FACE_API_SOURCE}</script>
   <script>
-    const MODEL_URL = "https://vladmandic.github.io/face-api/model/";
+    const MODELS = {
+      tiny: { specs: ${JSON.stringify(TINY_FACE_DETECTOR_WEIGHT_SPECS)}, b64: ${JSON.stringify(TINY_FACE_DETECTOR_WEIGHTS_B64)} },
+      expression: { specs: ${JSON.stringify(FACE_EXPRESSION_WEIGHT_SPECS)}, b64: ${JSON.stringify(FACE_EXPRESSION_WEIGHTS_B64)} },
+    };
     let modelsReady = false;
 
-    // Runtime CDN dependency — a conference-WiFi time bomb (see ToDo.md §2).
-    // Until the models are bundled as local assets, at least fail LOUDLY:
-    // report an error if face-api didn't load or models don't arrive in time.
-    const LOAD_TIMEOUT_MS = 20000;
+    // Assets are bundled — a failure here means a broken build, not a network
+    // outage. Still fail LOUDLY so the session UI can react.
+    const LOAD_TIMEOUT_MS = 10000;
     function reportError() {
       window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error' }));
     }
     setTimeout(() => { if (!modelsReady) reportError(); }, LOAD_TIMEOUT_MS);
 
-    async function loadModels() {
+    function b64ToBuffer(b64) {
+      const bin = atob(b64);
+      const bytes = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+      return bytes.buffer;
+    }
+
+    function loadModels() {
       try {
         if (typeof faceapi === 'undefined') { reportError(); return; }
-        await Promise.all([
-          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-        ]);
+        // decodeWeights handles the uint8-quantized specs these models ship with.
+        faceapi.nets.tinyFaceDetector.loadFromWeightMap(
+          faceapi.tf.io.decodeWeights(b64ToBuffer(MODELS.tiny.b64), MODELS.tiny.specs)
+        );
+        faceapi.nets.faceExpressionNet.loadFromWeightMap(
+          faceapi.tf.io.decodeWeights(b64ToBuffer(MODELS.expression.b64), MODELS.expression.specs)
+        );
         modelsReady = true;
         window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
       } catch (e) {

@@ -45,9 +45,9 @@ export function useFaceCapture({
       try {
         if (cancelled) return;
 
-        // NOTE: `scale` is not a takePictureAsync option (it was silently
-        // ignored) — real downscaling needs `pictureSize` on <CameraView> or
-        // expo-image-manipulator. quality 0.1 keeps the JPEG payload small.
+        // Downscaling happens at the source: EmotionPanel sets `pictureSize`
+        // on <CameraView> to the smallest supported size (~320-640 px) once
+        // the camera is ready. quality 0.1 keeps the JPEG payload small.
         const photo = await cameraRef.current?.takePictureAsync({
           quality: 0.1,
           base64: true,
