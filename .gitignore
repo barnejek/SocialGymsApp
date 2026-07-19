@@ -1,5 +1,12 @@
 # Learn more https://docs.github.com/en/get-started/getting-started-with-git/ignoring-files
 
+# Secrets — never commit. Real keys live in .env; template in .env.example.
+.env
+!.env.example
+
+# Local AI-assistant settings
+.claude/settings.local.json
+
 # dependencies
 node_modules/
 
