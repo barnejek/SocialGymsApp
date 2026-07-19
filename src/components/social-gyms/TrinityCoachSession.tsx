@@ -11,7 +11,7 @@ import { useGeminiLive } from '../../hooks/useGeminiLive';
 import { useSessionTimer } from '../../hooks/useSessionTimer';
 import { NEUTRAL_METRICS, type EmotionMetrics } from '../../lib/emotion';
 import { scoreConversation, type ChatMessage, type ScoreResult } from '../../lib/chat';
-import { trinityPrompt, type PhaseContext } from '../../lib/trinity';
+import { trinityPrompt, type PhaseContext, type RetrievedContext } from '../../lib/trinity';
 import { useAuth } from '../../components/AuthProvider';
 import { injectAutismGuardrails } from '../../lib/autism-guardrails';
 import {
@@ -38,10 +38,14 @@ import {
   type TrinityPhase,
   type LessonLength,
 } from '../../lib/phases';
+import { fetchGroundedTechnique } from '../../lib/rag';
 import { applyDifficulty, type DifficultyLevel, type Topic } from '../../lib/topics';
+import { DEMO_MODE } from '../../lib/utils';
 import { COLORS } from '../../constants/colors';
 
-const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? 'dummy-key-for-now';
+// No dummy fallback: a missing key must be visible, not silently produce a
+// dead WebSocket. DEMO_MODE runs without any key.
+const GEMINI_API_KEY = process.env.EXPO_PUBLIC_GEMINI_API_KEY ?? '';
 
 const FALLBACK_SCORE: ScoreResult = {
   attempt1: { engagement: 0, comfort: 0, openness: 0 },
@@ -99,6 +103,9 @@ export const TrinityCoachSession = ({
   const [cameraReady, setCameraReady] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [pendingResult, setPendingResult] = useState<SessionResult | null>(null);
+  // Engine misconfiguration / connection failure — surfaced in the UI instead
+  // of dying silently in the console (the web app uses a toast for this).
+  const [engineError, setEngineError] = useState<string | null>(null);
 
   const cameraRef = useRef<CameraView | null>(null);
   const bridgeRef = useRef<FaceTrackerBridgeHandle | null>(null);
@@ -107,6 +114,8 @@ export const TrinityCoachSession = ({
   const scenarioRef = useRef('');
   const attempt1Ref = useRef<ChatMessage[]>([]);
   const attempt2Ref = useRef<ChatMessage[]>([]);
+  // Corpus A retrieval — populated on Phase 2→3, reused for Phase 4 modeling + Phase 6 homework.
+  const retrievedRef = useRef<RetrievedContext | undefined>(undefined);
   const pendingAdvanceRef = useRef<{ next: TrinityPhase; kickoff?: string } | null>(null);
   const advanceGuardRef = useRef<Partial<Record<TrinityPhase, boolean>>>({});
 
@@ -140,6 +149,7 @@ export const TrinityCoachSession = ({
         faceTop: faceMetricsRef.current?.primaryEmotion,
         voiceTop: undefined,
       },
+      retrieved: retrievedRef.current,
     };
   }, []);
 
@@ -155,6 +165,23 @@ export const TrinityCoachSession = ({
     async (next: TrinityPhase, kickoffText?: string) => {
       setPhase(next);
       if (next === 'scoring') return;
+
+      // RAG checkpoint: piggybacks on the ~1–2s reconnect already spent here.
+      if (next === 'phase-3-feedback-1') {
+        const t = topicRef.current;
+        try {
+          retrievedRef.current = await fetchGroundedTechnique({
+            topicId: t.id,
+            subSkill: t.subSkill,
+            attempt1: attempt1Ref.current,
+            ageVariant: t.persona === 'b2b_autism_user' ? 'child' : 'adult',
+            phase: next,
+          });
+        } catch (e) {
+          console.warn('RAG retrieve failed — continuing without grounded technique', e);
+          retrievedRef.current = undefined;
+        }
+      }
 
       const systemPrompt = applyDifficulty(
         withGuardrails(trinityPrompt(next, buildCtx())),
@@ -219,6 +246,13 @@ export const TrinityCoachSession = ({
     if (!active || startedRef.current) return;
     startedRef.current = true;
 
+    if (!DEMO_MODE && !GEMINI_API_KEY) {
+      setEngineError(
+        'No Gemini API key configured — the live coach can’t connect. Set EXPO_PUBLIC_GEMINI_API_KEY in .env (or EXPO_PUBLIC_DEMO_MODE=true for the scripted demo) and restart.',
+      );
+      return;
+    }
+
     (async () => {
       try {
         await geminiRef.current.connect(
@@ -230,6 +264,7 @@ export const TrinityCoachSession = ({
         setTimeout(() => geminiRef.current.sendText('Begin the setup now.'), 400);
       } catch (e) {
         console.error('Gemini Live connect failed', e);
+        setEngineError('Couldn’t connect to your coach — check your network and API key, then try again.');
       }
     })();
 
@@ -486,6 +521,13 @@ export const TrinityCoachSession = ({
         </View>
       ) : (
         <>
+          {engineError && (
+            <View className="rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 mb-3">
+              <Text className="text-sm leading-relaxed" style={{ color: COLORS.destructive }}>
+                {engineError}
+              </Text>
+            </View>
+          )}
           <View
             className="rounded-2xl border border-border bg-surface overflow-hidden mb-3"
             style={{ flex: 1, flexShrink: 1, minHeight: 0 }}
@@ -521,6 +563,7 @@ export const TrinityCoachSession = ({
               cameraGranted={cameraGranted}
               metrics={fused}
               evi={gemini.status.value}
+              phase={phase}
               cameraRef={cameraRef}
               bridgeRef={bridgeRef}
               onMetrics={setFaceMetrics}

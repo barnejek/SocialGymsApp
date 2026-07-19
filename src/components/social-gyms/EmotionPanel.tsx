@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, type RefObject } from 'react';
+import React, { useEffect, useRef, useState, type RefObject } from 'react';
 import { View, Text, StyleSheet, Animated } from 'react-native';
 import { CameraView } from 'expo-camera';
 import { FaceTrackerBridge, type FaceTrackerBridgeHandle } from '../FaceTrackerBridge';
 import { useAuth } from '../../components/AuthProvider';
 import type { EmotionMetrics } from '../../lib/emotion';
+import { isTimedPhase, type TrinityPhase } from '../../lib/phases';
 import { DEMO_MODE } from '../../lib/utils';
 import { COLORS } from '../../constants/colors';
 
@@ -13,6 +14,13 @@ interface EmotionPanelProps {
   cameraGranted: boolean;
   metrics: EmotionMetrics;
   evi: string;
+  /**
+   * Current session phase. Mirrors the web panel: during the rehearsal rounds
+   * (convo-1, reversal, convo-2) the numeric readout is force-hidden — watching
+   * your own anxiety score while performing increases self-focused attention
+   * (Clark & Wells). Analysis keeps running either way.
+   */
+  phase?: TrinityPhase;
   cameraRef: RefObject<CameraView | null>;
   bridgeRef: RefObject<FaceTrackerBridgeHandle | null>;
   onMetrics: (metrics: EmotionMetrics) => void;
@@ -21,8 +29,7 @@ interface EmotionPanelProps {
 
 const METRIC_COLORS = {
   engagement: COLORS.engagement,
-  comfort: COLORS.comfort,
-  openness: COLORS.openness,
+  confidence: COLORS.comfort,
   anxiety: COLORS.destructive,
   smiling: '#FBBF24',
 } as const;
@@ -83,21 +90,32 @@ export const EmotionPanel = ({
   cameraGranted,
   metrics,
   evi: _evi,
+  phase,
   cameraRef,
   bridgeRef,
   onMetrics,
   onCameraReady,
 }: EmotionPanelProps) => {
   const { user } = useAuth();
+  const [faceError, setFaceError] = useState(false);
 
   const showCamera = active && cameraGranted;
 
+  // Child (autism) persona NEVER sees numeric metrics — percentages and
+  // "Anxiety: 62%" are clinically inappropriate for the child view; the
+  // quantitative data belongs in the carer portal after the session.
+  const isChild = user?.persona === 'b2b_autism_user';
+  // Rehearsal rounds force-hide the numbers for everyone (parity with web).
+  const rehearsing = phase != null && isTimedPhase(phase);
+  const showNumbers = !isChild && !rehearsing;
+
+  // Same four rows and definitions as the web panel — "Openness" was showing
+  // `confidence` here while scoring uses `smiling` as openness; label honestly.
   const rows: { label: string; key: MetricKey; value: number }[] = [
+    { label: 'Confidence', key: 'confidence', value: metrics.confidence },
     { label: 'Engagement', key: 'engagement', value: metrics.engagement },
-    { label: 'Comfort', key: 'comfort', value: 100 - metrics.anxiety },
-    { label: 'Openness', key: 'openness', value: metrics.confidence },
-    { label: 'Anxiety', key: 'anxiety', value: metrics.anxiety },
     { label: 'Smiling', key: 'smiling', value: metrics.smiling },
+    { label: 'Anxiety', key: 'anxiety', value: metrics.anxiety },
   ];
 
   return (
@@ -111,10 +129,22 @@ export const EmotionPanel = ({
               facing="front"
               onCameraReady={onCameraReady}
             />
-            <FaceTrackerBridge ref={bridgeRef} enabled={active} onMetrics={onMetrics} />
+            <FaceTrackerBridge
+              ref={bridgeRef}
+              enabled={active}
+              onMetrics={onMetrics}
+              onError={() => setFaceError(true)}
+            />
             <View className="absolute top-2 left-2">
               <LivePulse active={active} />
             </View>
+            {faceError && (
+              <View className="absolute bottom-0 left-0 right-0 bg-black/70 px-2 py-1">
+                <Text className="text-[9px] text-center" style={{ color: COLORS.mutedForeground }}>
+                  Face tracking unavailable
+                </Text>
+              </View>
+            )}
           </>
         ) : (
           <View className="flex-1 items-center justify-center">
@@ -132,14 +162,24 @@ export const EmotionPanel = ({
 
       <View className="flex-1 bg-surface-2 rounded-2xl border border-border px-4 py-3">
         <View className="flex-row items-center justify-between mb-3">
-          <Text className="text-sm font-semibold text-foreground">Real-time presence</Text>
+          <Text className="text-sm font-semibold text-foreground">
+            {isChild ? 'Your coach is with you' : 'Real-time presence'}
+          </Text>
           <LivePulse active={active} />
         </View>
-        {rows.map(r => (
-          <AnimatedMetric key={r.key} label={r.label} value={r.value} color={METRIC_COLORS[r.key]} />
-        ))}
-        {user?.persona === 'b2b_autism_user' && (
-          <Text className="text-[9px] text-muted-foreground mt-1">Eye contact not tracked in this mode</Text>
+        {showNumbers ? (
+          rows.map(r => (
+            <AnimatedMetric key={r.key} label={r.label} value={r.value} color={METRIC_COLORS[r.key]} />
+          ))
+        ) : (
+          <Text className="text-xs leading-relaxed text-muted-foreground">
+            {isChild
+              ? 'Alex is listening and playing along with you. You’re doing great — just keep talking!'
+              : 'You’re mid-rep — your coach keeps reading silently, like a coach watching your form. The full breakdown comes after the round.'}
+          </Text>
+        )}
+        {isChild && (
+          <Text className="text-[9px] text-muted-foreground mt-2">Eye contact not tracked in this mode</Text>
         )}
       </View>
     </View>

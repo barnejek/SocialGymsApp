@@ -10,6 +10,8 @@ export interface FaceTrackerBridgeHandle {
 interface FaceTrackerBridgeProps {
   onMetrics: (metrics: EmotionMetrics) => void;
   enabled: boolean;
+  /** Fired when face-api / its models fail to load (offline, CDN down, timeout). */
+  onError?: () => void;
 }
 
 const faceApiHtml = `
@@ -25,13 +27,27 @@ const faceApiHtml = `
     const MODEL_URL = "https://vladmandic.github.io/face-api/model/";
     let modelsReady = false;
 
+    // Runtime CDN dependency — a conference-WiFi time bomb (see ToDo.md §2).
+    // Until the models are bundled as local assets, at least fail LOUDLY:
+    // report an error if face-api didn't load or models don't arrive in time.
+    const LOAD_TIMEOUT_MS = 20000;
+    function reportError() {
+      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'error' }));
+    }
+    setTimeout(() => { if (!modelsReady) reportError(); }, LOAD_TIMEOUT_MS);
+
     async function loadModels() {
-      await Promise.all([
-        faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
-        faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
-      ]);
-      modelsReady = true;
-      window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+      try {
+        if (typeof faceapi === 'undefined') { reportError(); return; }
+        await Promise.all([
+          faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+          faceapi.nets.faceExpressionNet.loadFromUri(MODEL_URL),
+        ]);
+        modelsReady = true;
+        window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'ready' }));
+      } catch (e) {
+        reportError();
+      }
     }
     loadModels();
 
@@ -58,7 +74,9 @@ const faceApiHtml = `
       const img = document.getElementById('image');
       img.src = data;
       img.onload = async () => {
-        const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions()).withFaceExpressions();
+        // inputSize 224 (default 416) ≈ 3–4× less compute per detection — the
+        // same tuning the web hook uses; the WebView runs on weaker hardware.
+        const det = await faceapi.detectSingleFace(img, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.3 })).withFaceExpressions();
         if (det) {
           const metrics = expressionsToMetrics(det.expressions);
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'metrics', data: metrics }));
@@ -76,7 +94,7 @@ const faceApiHtml = `
 `;
 
 export const FaceTrackerBridge = forwardRef<FaceTrackerBridgeHandle, FaceTrackerBridgeProps>(
-  function FaceTrackerBridge({ onMetrics, enabled }, ref) {
+  function FaceTrackerBridge({ onMetrics, enabled, onError }, ref) {
     const webViewRef = useRef<WebView>(null);
     const [isReady, setIsReady] = useState(false);
 
@@ -100,6 +118,7 @@ export const FaceTrackerBridge = forwardRef<FaceTrackerBridgeHandle, FaceTracker
             try {
               const msg = JSON.parse(event.nativeEvent.data);
               if (msg.type === 'ready') setIsReady(true);
+              if (msg.type === 'error') onError?.();
               if (msg.type === 'metrics' && onMetrics) {
                 onMetrics(msg.data);
               }

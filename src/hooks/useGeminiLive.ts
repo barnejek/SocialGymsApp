@@ -283,6 +283,16 @@ function useGeminiLiveReal(apiKey: string) {
         wsRef.current = ws;
         wsTargetRef.current = ws;
 
+        // Resolve once: on the server's setupComplete ack when it sends one,
+        // otherwise on a short fallback timer (some v1beta native-audio models
+        // never ack). Waiting prevents mic frames racing the setup config.
+        let settled = false;
+        const settle = (value: WebSocket | null) => {
+          if (settled) return;
+          settled = true;
+          resolve(value);
+        };
+
         ws.onopen = () => {
           ws.send(
             JSON.stringify({
@@ -309,7 +319,7 @@ function useGeminiLiveReal(apiKey: string) {
             })
           );
           setStatus({ value: "connected" });
-          resolve(ws);
+          setTimeout(() => settle(ws), 800);
         };
 
         ws.onmessage = (evt) => {
@@ -317,6 +327,8 @@ function useGeminiLiveReal(apiKey: string) {
             const text = typeof evt.data === "string" ? evt.data : String(evt.data);
             const data = JSON.parse(text);
             reconnectAttemptsRef.current = 0;
+            // Explicit setup ack → safe to start streaming mic audio now.
+            if (data?.setupComplete) settle(ws);
 
             const parts: unknown[] = data?.serverContent?.modelTurn?.parts ?? [];
             for (const part of parts as Record<string, unknown>[]) {
@@ -373,7 +385,7 @@ function useGeminiLiveReal(apiKey: string) {
 
         ws.onerror = () => {
           if (!reconnectingRef.current) setStatus({ value: "disconnected" });
-          resolve(null);
+          settle(null);
         };
 
         ws.onclose = (evt) => {

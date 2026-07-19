@@ -60,10 +60,12 @@ export function useFaceCapture({
       try {
         if (cancelled) return;
 
+        // NOTE: `scale` is not a takePictureAsync option (it was silently
+        // ignored) — real downscaling needs `pictureSize` on <CameraView> or
+        // expo-image-manipulator. quality 0.1 keeps the JPEG payload small.
         const photo = await cameraRef.current?.takePictureAsync({
           quality: 0.1,
           base64: true,
-          scale: 0.2,
         });
 
         if (photo?.base64 && bridgeRef.current) {

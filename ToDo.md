@@ -6,6 +6,17 @@
 
 ---
 
+## 1a. Fixed in the full-stack audit pass (2026-07-19)
+
+- **Env/config**: removed the `'dummy-key-for-now'` Gemini fallback; a missing `EXPO_PUBLIC_GEMINI_API_KEY` (or a failed connect) now shows a visible error banner in the session screen. `.env` gained the missing `EXPO_PUBLIC_GEMINI_API_KEY` + `EXPO_PUBLIC_DEMO_MODE=true` entries (demo on until a key is filled in).
+- **Env naming**: `chat.ts` / `supabaseStorage.ts` now accept `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY` *or* `_ANON_KEY` (matching `rag.ts` and the web repo); killed the `b2b-placeholder-url` fallback — missing env now fails loudly.
+- **Child metric hiding (the §3 ✅ that wasn't)**: `EmotionPanel` now takes `phase`; numeric gauges are force-hidden during rehearsal rounds (web parity, Clark & Wells) and hidden *entirely* for the `b2b_autism_user` persona — the child sees a friendly line instead.
+- **"Openness" mislabel**: the panel showed `confidence` as Openness while scoring uses `smiling` as openness. Rows now match the web panel: Confidence / Engagement / Smiling / Anxiety.
+- **Face bridge**: detection tuned to `inputSize: 224, scoreThreshold: 0.3` (web parity, ~3–4× less compute); CDN load failures/timeouts now post an `error` message → "Face tracking unavailable" overlay instead of silently dead gauges. Bundling face-api + models as local assets remains the real fix (§2).
+- **`takePictureAsync`**: removed the invalid `scale` option (it was silently ignored); real downscaling still to do via `pictureSize`.
+- **Setup handshake**: `useGeminiLive` (both repos) now waits for `setupComplete` (800 ms fallback) before mic streaming starts.
+- **Supabase**: `score-conversation` (and likely `retrieve-context`) return 500 — the `GEMINI_API_KEY` secret is not set on project `rzplvdxylixgptrjxqdc`. Set it via dashboard → Edge Functions → Secrets, or `supabase secrets set`.
+
 ## 1. Fixed in this pass (changelog)
 
 - Removed dead Expo template code that shipped a demo "Explore" route inside the pitch app (`explore.tsx`, `themed-*`, `app-tabs*`, `animated-icon*`, `collapsible`, `external-link`, `hint-row`, `web-badge`, `use-theme`, `use-color-scheme*`, `constants/theme.ts`).
@@ -43,7 +54,7 @@ This is the crucial feature. Current state and the path I recommend:
 - **Mic permission** is never requested (camera permission is). Add it to the pre-session flow.
 - `prosodyToMetrics` in `lib/emotion.ts` is Hume-EVI vocabulary left over from the web app; Gemini Live provides no prosody scores. Remove it or relabel honestly ("voice analysis: roadmap").
 
-### 🔴 Demo Mode (the single highest-value item for the pitch)
+### ✅ Demo Mode (the single highest-value item for the pitch)
 Add a `DEMO_MODE` flag that plays back a **scripted session**: a pre-written transcript that streams in word-by-word, a fake emotion-metrics timeline animating the gauges, timers running for real. The pitch then never depends on WiFi, mic permissions, API quota, or Gemini latency — and every run is flawlessly identical. Wire it behind the same `useGeminiLive` interface so the real engine drops in later without UI changes.
 
 ---
@@ -69,7 +80,7 @@ Add a `DEMO_MODE` flag that plays back a **scripted session**: a pre-written tra
 - 🟢 Sensory check-in before sessions (3 large emoji-faces: "How is Sam feeling?") which adjusts the guardrail prompt (already supported by `sensoryProfile`).
 
 ### Autism training flow (`AutismScenarioPicker`, session)
-- 🔴 *(Consultant hat)* during sessions, **hide numeric metrics from the child view**. Percentages and "Anxiety: 62%" on screen are clinically inappropriate and will alarm clinician evaluators. Child sees a friendly companion + star rewards; the quantitative panel belongs in the carer portal/enterprise tracker after the fact.
+- ✅ *(Consultant hat)* during sessions, **hide numeric metrics from the child view**. Percentages and "Anxiety: 62%" on screen are clinically inappropriate and will alarm clinician evaluators. Child sees a friendly companion + star rewards; the quantitative panel belongs in the carer portal/enterprise tracker after the fact.
 - 🟡 The picker ignores `length`/`onLengthChange` (props passed, never rendered) — children's sessions also shouldn't default to adult durations. Offer "Short / Long" with visual icons; default shorter than 5 min.
 - 🟡 Replace abstract lucide icons (megaphone = "Sensory"?) with concrete picture cues (photos/illustrations of a playground, headphones, a classroom). Concrete > symbolic is the rule for this population.
 - 🟢 More micro-scenarios in `topics.ts`: turn-taking, losing a game gracefully, asking for help, ordering food. Add `ageBand` and `difficulty` fields.

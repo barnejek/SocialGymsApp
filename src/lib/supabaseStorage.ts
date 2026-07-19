@@ -14,4 +14,6 @@ export const authStorage: SupportedStorage | undefined = AsyncStorage;
 export const envSupabaseUrl: string | undefined =
   process.env.EXPO_PUBLIC_SUPABASE_URL || undefined;
 export const envSupabaseAnonKey: string | undefined =
-  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || undefined;
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ||
+  undefined;

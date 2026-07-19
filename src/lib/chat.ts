@@ -12,7 +12,14 @@ export interface ChatMessage {
   content: string;
 }
 
-const API_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || "https://b2b-placeholder-url.supabase.co";
+// No placeholder fallback: a missing URL should fail loudly at the call site,
+// not produce a mysterious fetch error against a fake host.
+const API_URL = process.env.EXPO_PUBLIC_SUPABASE_URL;
+// Accept both key names — Supabase is migrating "anon" → "publishable", and the
+// web repo already standardized on PUBLISHABLE. (Same pattern as lib/rag.ts.)
+const SUPABASE_KEY =
+  process.env.EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+  process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY;
 const SCORE_URL = `${API_URL}/functions/v1/score-conversation`;
 
 export interface ScoreResult {
@@ -52,12 +59,18 @@ export async function scoreConversation(input: {
     await new Promise((r) => setTimeout(r, 1200)); // believable grading beat
     return DEMO_SCORE;
   }
+  if (!API_URL || !SUPABASE_KEY) {
+    toast.error(
+      "Supabase env vars missing (EXPO_PUBLIC_SUPABASE_URL / _ANON_KEY) — can't score this session."
+    );
+    return null;
+  }
   try {
     const resp = await fetch(SCORE_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Authorization: `Bearer ${process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY}`
+        Authorization: `Bearer ${SUPABASE_KEY}`
       },
       body: JSON.stringify(input),
     });
