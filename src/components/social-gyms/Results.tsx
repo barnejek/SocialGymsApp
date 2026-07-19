@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { View, Text, ScrollView, TouchableOpacity, Animated } from 'react-native';
 import { TrendingUp, TrendingDown, Minus, RefreshCw, Quote } from 'lucide-react-native';
 import type { ChatMessage, ScoreResult } from '../../lib/chat';
+import type { PresenceRead } from '../../lib/emotion';
 import type { Topic } from '../../lib/topics';
 import { COLORS } from '../../constants/colors';
 
@@ -15,6 +16,8 @@ export interface SessionResult {
   scoring: ScoreResult;
   /** Live multimodal read (0-100) captured during the session. */
   presence: { engagement: number; comfort: number; openness: number };
+  /** Camera presence averaged per attempt — null when the camera was off. */
+  presenceByAttempt?: { attempt1: PresenceRead | null; attempt2: PresenceRead | null };
   goldenRule: string;
 }
 
@@ -113,11 +116,36 @@ const InsightCard = ({ label, body, accent }: { label: string; body: string; acc
   </View>
 );
 
+const CameraRow = ({
+  label, color, a1, a2,
+}: {
+  label: string; color: string; a1: number | null; a2: number | null;
+}) => (
+  <View className="mb-4">
+    <View className="flex-row items-center justify-between mb-1.5">
+      <Text className="text-sm font-semibold text-foreground">{label}</Text>
+      {a1 != null && a2 != null && <Delta from={a1} to={a2} />}
+    </View>
+    {([['Attempt 1', a1, true], ['Attempt 2', a2, false]] as const).map(([t, v, faded]) => (
+      <View key={t} className="flex-row items-center mb-1">
+        <Text className="text-[10px] uppercase text-muted-foreground w-16">{t}</Text>
+        <View className="flex-1 mx-2">
+          <GrowBar value={v ?? 0} color={color} faded={faded} />
+        </View>
+        <Text className="text-xs tabular-nums text-muted-foreground w-8 text-right">{v != null ? v : '—'}</Text>
+      </View>
+    ))}
+  </View>
+);
+
 export const Results = ({ result, onTryAnother }: Props) => {
   const s = result.scoring;
   const overall1 = Math.round((s.attempt1.engagement + s.attempt1.comfort + s.attempt1.openness) / 3);
   const overall2 = Math.round((s.attempt2.engagement + s.attempt2.comfort + s.attempt2.openness) / 3);
   const finalScore = useCountUp(overall2, 1100);
+  const cam1 = result.presenceByAttempt?.attempt1 ?? null;
+  const cam2 = result.presenceByAttempt?.attempt2 ?? null;
+  const hasCamera = cam1 != null || cam2 != null;
 
   return (
     <ScrollView className="flex-1 bg-background" contentContainerStyle={{ padding: 20, paddingBottom: 48 }}>
@@ -146,6 +174,20 @@ export const Results = ({ result, onTryAnother }: Props) => {
         <DimensionCompare label="Comfort" color={DIM_COLORS.comfort} before={s.attempt1.comfort} after={s.attempt2.comfort} />
         <DimensionCompare label="Openness" color={DIM_COLORS.openness} before={s.attempt1.openness} after={s.attempt2.openness} />
       </View>
+
+      {/* What the camera saw — live face analysis, averaged per attempt */}
+      {hasCamera && (
+        <View className="rounded-3xl border border-border bg-surface p-5 mb-5">
+          <Text className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5">What the camera saw</Text>
+          <Text className="text-xs text-muted-foreground leading-relaxed mb-4">
+            Averaged live from your face during each attempt. Your coach used this read
+            to adjust the scene in real time, and it fed into your score.
+          </Text>
+          <CameraRow label="Engagement" color={DIM_COLORS.engagement} a1={cam1?.engagement ?? null} a2={cam2?.engagement ?? null} />
+          <CameraRow label="Comfort" color={DIM_COLORS.comfort} a1={cam1?.comfort ?? null} a2={cam2?.comfort ?? null} />
+          <CameraRow label="Openness" color={DIM_COLORS.openness} a1={cam1?.openness ?? null} a2={cam2?.openness ?? null} />
+        </View>
+      )}
 
       {/* Golden Rule */}
       <View className="rounded-3xl border border-primary/40 bg-primary/10 p-5 mb-5">

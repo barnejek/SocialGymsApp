@@ -9,7 +9,14 @@ import type { FaceTrackerBridgeHandle } from '../FaceTrackerBridge';
 import { useFaceCapture } from '../../hooks/useFaceCapture';
 import { useGeminiLive } from '../../hooks/useGeminiLive';
 import { useSessionTimer } from '../../hooks/useSessionTimer';
-import { NEUTRAL_METRICS, type EmotionMetrics } from '../../lib/emotion';
+import {
+  NEUTRAL_METRICS,
+  averageMetrics,
+  describeCameraRead,
+  metricsToPresence,
+  type EmotionMetrics,
+  type PresenceRead,
+} from '../../lib/emotion';
 import { scoreConversation, type ChatMessage, type ScoreResult } from '../../lib/chat';
 import { trinityPrompt, type PhaseContext, type RetrievedContext } from '../../lib/trinity';
 import { useAuth } from '../../components/AuthProvider';
@@ -99,6 +106,11 @@ export const TrinityCoachSession = ({
   const fusedRef = useRef(fused);
   useEffect(() => { fusedRef.current = fused; }, [fused]);
 
+  // Every face frame is banked under the phase it was captured in, so the
+  // coach's feedback, the grader, and the results screen work from what
+  // actually happened during each attempt — not a single last-frame snapshot.
+  const samplesByPhaseRef = useRef<Partial<Record<TrinityPhase, EmotionMetrics[]>>>({});
+
   const [cameraReady, setCameraReady] = useState(false);
   const [sessionComplete, setSessionComplete] = useState(false);
   const [pendingResult, setPendingResult] = useState<SessionResult | null>(null);
@@ -125,6 +137,11 @@ export const TrinityCoachSession = ({
   const faceMetricsRef = useRef(faceMetrics);
   useEffect(() => { faceMetricsRef.current = faceMetrics; }, [faceMetrics]);
 
+  const handleFaceMetrics = useCallback((m: EmotionMetrics) => {
+    setFaceMetrics(m);
+    (samplesByPhaseRef.current[phaseRef.current] ??= []).push(m);
+  }, []);
+
   useFaceCapture({
     cameraRef,
     bridgeRef,
@@ -132,8 +149,30 @@ export const TrinityCoachSession = ({
     enabled: active,
     cameraReady,
     intervalMs: 3000,
-    onMetrics: setFaceMetrics,
+    onMetrics: handleFaceMetrics,
   });
+
+  // ── Presence aggregation helpers (refs only — safe with empty deps) ────────
+  const attemptSamples = useCallback(
+    (p: TrinityPhase) => samplesByPhaseRef.current[p] ?? [],
+    [],
+  );
+  /** Per-attempt camera presence; null when no frames were captured. */
+  const presenceFor = useCallback(
+    (p: TrinityPhase): PresenceRead | null => {
+      const avg = averageMetrics(attemptSamples(p));
+      return avg ? metricsToPresence(avg) : null;
+    },
+    [attemptSamples],
+  );
+  /** Whole-session presence for the grader: both attempts averaged. */
+  const sessionPresence = useCallback((): PresenceRead => {
+    const all = [
+      ...attemptSamples('phase-2-convo-1'),
+      ...attemptSamples('phase-5-convo-2'),
+    ];
+    return metricsToPresence(averageMetrics(all) ?? fusedRef.current);
+  }, [attemptSamples]);
 
   const buildCtx = useCallback((): PhaseContext => {
     const f = fusedRef.current;
@@ -193,9 +232,14 @@ export const TrinityCoachSession = ({
       const t2 = () =>
         attempt2Ref.current.map((m) => `${m.role === 'user' ? 'Me' : 'Coach'}: ${m.content}`).join('\n');
 
+      // Averaged camera summaries ride along with the transcripts so the
+      // coach's feedback is grounded in the whole attempt, not one frame.
+      const read1 = describeCameraRead('the first attempt', attemptSamples('phase-2-convo-1'));
+      const read2 = describeCameraRead('the second attempt', attemptSamples('phase-5-convo-2'));
+
       if (next === 'phase-3-feedback-1') {
         geminiRef.current.sendText(
-          `My first attempt transcript:\n${t1() || '(no transcript)'}\n\n${kickoffText ?? KICKOFF_FEEDBACK}`,
+          `My first attempt transcript:\n${t1() || '(no transcript)'}${read1 ? `\n\n${read1}` : ''}\n\n${kickoffText ?? KICKOFF_FEEDBACK}`,
         );
       } else if (next === 'phase-4-reversal') {
         geminiRef.current.sendText(
@@ -203,13 +247,13 @@ export const TrinityCoachSession = ({
         );
       } else if (next === 'phase-6-final') {
         geminiRef.current.sendText(
-          `First attempt:\n${t1() || '(no transcript)'}\n\nSecond attempt:\n${t2() || '(no transcript)'}\n\n${kickoffText ?? KICKOFF_FINAL}`,
+          `First attempt:\n${t1() || '(no transcript)'}\n\nSecond attempt:\n${t2() || '(no transcript)'}${read1 ? `\n\n${read1}` : ''}${read2 ? `\n${read2}` : ''}\n\n${kickoffText ?? KICKOFF_FINAL}`,
         );
       } else if (kickoffText) {
         setTimeout(() => geminiRef.current.sendText(kickoffText), 300);
       }
     },
-    [buildCtx, withGuardrails],
+    [buildCtx, withGuardrails, attemptSamples],
   );
 
   const advanceToRef = useRef(advanceTo);
@@ -229,6 +273,43 @@ export const TrinityCoachSession = ({
     pendingAdvanceRef.current = null;
     void advanceTo(next, kickoff);
   }, [gemini.isPlaying, advanceTo]);
+
+  // ── Live graded-exposure weave ─────────────────────────────────────────────
+  // During the two user-performed rounds, feed the coach a fresh camera read
+  // every ~20 s as SILENT context (no spoken reply is triggered), so the
+  // counterpart can crank the stakes up or ease off mid-round — not just at
+  // phase boundaries. Skipped when nothing meaningful moved (saves context).
+  const lastWeaveRef = useRef<{ anxiety: number; engagement: number } | null>(null);
+  useEffect(() => {
+    if (phase !== 'phase-2-convo-1' && phase !== 'phase-5-convo-2') {
+      lastWeaveRef.current = null;
+      return;
+    }
+    const id = setInterval(() => {
+      // ≈ the last 18 s of frames (3 s cadence) — recent, but noise-averaged.
+      const recent = averageMetrics(attemptSamples(phaseRef.current).slice(-6));
+      if (!recent) return;
+      const last = lastWeaveRef.current;
+      if (
+        last &&
+        Math.abs(recent.anxiety - last.anxiety) < 10 &&
+        Math.abs(recent.engagement - last.engagement) < 10
+      ) {
+        return;
+      }
+      lastWeaveRef.current = { anxiety: recent.anxiety, engagement: recent.engagement };
+      const steer =
+        recent.anxiety >= 60
+          ? 'They read strained — ease the stakes a notch: warmer, more receptive, simpler.'
+          : recent.anxiety <= 30
+          ? 'They read comfortable — stretch them a notch: a mild objection, a follow-up question, slightly more challenge.'
+          : 'Hold the current level of challenge.';
+      geminiRef.current.sendContext(
+        `[CAMERA READ — silent coaching signal, not spoken by the user; never acknowledge or mention it] Anxiety ${recent.anxiety}%, engagement ${recent.engagement}%, confidence ${recent.confidence}%. ${steer}`,
+      );
+    }, 20000);
+    return () => clearInterval(id);
+  }, [phase, attemptSamples]);
 
   const timed = isTimedPhase(phase);
   const timerDuration = phaseDurationSec(phase, lessonLength);
@@ -289,15 +370,11 @@ export const TrinityCoachSession = ({
       scenario: scenarioRef.current,
       attempt1: attempt1Ref.current,
       attempt2: attempt2Ref.current,
-      presence: {
-        engagement: fusedRef.current.engagement,
-        comfort: 100 - fusedRef.current.anxiety,
-        openness: fusedRef.current.smiling,
-      },
+      presence: sessionPresence(),
     }).then((result) => {
       earlyScoreRef.current = result;
     }).catch(() => {});
-  }, [phase]);
+  }, [phase, skipScoring, sessionPresence]);
 
   const finalize = useCallback(async () => {
     if (finalizeRanRef.current) return;
@@ -315,11 +392,7 @@ export const TrinityCoachSession = ({
           scenario: scenarioRef.current,
           attempt1: attempt1Ref.current,
           attempt2: attempt2Ref.current,
-          presence: {
-            engagement: fusedRef.current.engagement,
-            comfort: 100 - fusedRef.current.anxiety,
-            openness: fusedRef.current.smiling,
-          },
+          presence: sessionPresence(),
         });
       } catch {
         // toast handled inside helper
@@ -335,10 +408,10 @@ export const TrinityCoachSession = ({
       attempt1: attempt1Ref.current,
       attempt2: attempt2Ref.current,
       scoring: scoring ?? FALLBACK_SCORE,
-      presence: {
-        engagement: fusedRef.current.engagement,
-        comfort: 100 - fusedRef.current.anxiety,
-        openness: fusedRef.current.smiling,
+      presence: sessionPresence(),
+      presenceByAttempt: {
+        attempt1: presenceFor('phase-2-convo-1'),
+        attempt2: presenceFor('phase-5-convo-2'),
       },
       goldenRule:
         goldenRuleRef.current ??
@@ -346,7 +419,7 @@ export const TrinityCoachSession = ({
     };
     setPendingResult(result);
     setSessionComplete(true);
-  }, [skipScoring]);
+  }, [skipScoring, sessionPresence, presenceFor]);
 
   const lastSeenRef = useRef(0);
   useEffect(() => {

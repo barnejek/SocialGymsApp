@@ -406,6 +406,24 @@ export function useGeminiLive(apiKey: string) {
     ws.send(JSON.stringify({ realtimeInput: { text } }));
   }, []);
 
+  /**
+   * Inject silent context (live camera reads). Uses clientContent with
+   * turnComplete:false so the text lands in the model's context WITHOUT
+   * triggering a spoken response — the coach adapts on its next natural turn.
+   */
+  const sendContext = useCallback((text: string) => {
+    const ws = wsRef.current;
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(
+      JSON.stringify({
+        clientContent: {
+          turns: [{ role: "user", parts: [{ text }] }],
+          turnComplete: false,
+        },
+      })
+    );
+  }, []);
+
   const mute = useCallback(() => setIsMuted(true), []);
   const unmute = useCallback(() => setIsMuted(false), []);
 
@@ -419,6 +437,7 @@ export function useGeminiLive(apiKey: string) {
     disconnect,
     updateSystemPrompt,
     sendText,
+    sendContext,
     mute,
     unmute,
   };
