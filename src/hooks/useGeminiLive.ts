@@ -40,6 +40,10 @@ const WS_BASE =
 const MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025";
 const MAX_RECONNECTS = 4;
 const PLAYBACK_SAMPLE_RATE = 24000;
+/** Extra window after the coach's audio ends before the mic reopens (room reverb). */
+const HALF_DUPLEX_TAIL_MS = 250;
+/** How often the on-screen transcript is re-synced to the audio clock. */
+const REVEAL_TICK_MS = 80;
 
 function decodePcm16ToFloat32(b64: string): Float32Array {
   const bin = Buffer.from(b64, "base64");
@@ -83,6 +87,13 @@ export function useGeminiLive(apiKey: string) {
   const queueRef = useRef<AudioBufferQueueSourceNode | null>(null);
   const scheduleEndRef = useRef(0); // AudioContext seconds
   const playTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Date.now() ms until which the speaker is audible — half-duplex mic gate. */
+  const coachAudibleUntilRef = useRef(0);
+  /** AudioContext time at which the current turn's audio began. */
+  const audioTurnStartRef = useRef(0);
+  /** Set when turnComplete arrives; the turn is flushed to `messages` only once its audio finishes playing. */
+  const pendingTurnFlushRef = useRef(false);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const destroyedRef = useRef(false);
   const reconnectingRef = useRef(false);
@@ -126,6 +137,58 @@ export function useGeminiLive(apiKey: string) {
     return { ctx, queue };
   }, []);
 
+  const stopReveal = useCallback(() => {
+    if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+    revealTimerRef.current = null;
+  }, []);
+
+  /** Commit the finished turn to `messages` and clear the streaming buffer. */
+  const finishTurn = useCallback(() => {
+    pendingTurnFlushRef.current = false;
+    const full = currentTurnTranscriptRef.current.trim();
+    currentTurnTranscriptRef.current = "";
+    setLiveAssistantText("");
+    stopReveal();
+    if (full) {
+      setMessages((prev) => [
+        ...prev,
+        { type: "assistant_message", message: { role: "assistant", content: full } },
+      ]);
+    }
+  }, [stopReveal]);
+
+  /**
+   * Reveal the transcript in step with the audio clock.
+   *
+   * Gemini streams outputTranscription far ahead of playback — the text for a
+   * whole sentence lands while the speaker is still on its first word, so
+   * printing it on arrival ran visibly ahead of the voice. Instead we reveal
+   * `charsSoFar * (audioPlayed / audioReceived)`; both quantities are known
+   * because every chunk's duration is known when we queue it. The finished turn
+   * is committed to `messages` only when its audio actually finishes, so the
+   * chat bubble never appears before the coach has said it.
+   */
+  const startReveal = useCallback(() => {
+    if (revealTimerRef.current) return;
+    revealTimerRef.current = setInterval(() => {
+      const ctx = playCtxRef.current;
+      const full = currentTurnTranscriptRef.current;
+      const start = audioTurnStartRef.current;
+      const end = scheduleEndRef.current;
+
+      // No audio clock to pace against (text-only turn) — show it all.
+      if (!ctx || end <= start) {
+        if (full) setLiveAssistantText(full);
+        if (pendingTurnFlushRef.current) finishTurn();
+        return;
+      }
+
+      const frac = Math.min(1, Math.max(0, (ctx.currentTime - start) / (end - start)));
+      if (full) setLiveAssistantText(full.slice(0, Math.ceil(full.length * frac)));
+      if (frac >= 1 && pendingTurnFlushRef.current) finishTurn();
+    }, REVEAL_TICK_MS);
+  }, [finishTurn]);
+
   const scheduleAudio = useCallback(
     (f32: Float32Array) => {
       try {
@@ -138,17 +201,20 @@ export function useGeminiLive(apiKey: string) {
         const duration = f32.length / PLAYBACK_SAMPLE_RATE;
         const fresh = scheduleEndRef.current <= now;
         const startAt = fresh ? now + 0.09 : Math.max(now + 0.01, scheduleEndRef.current);
+        if (fresh) audioTurnStartRef.current = startAt;
         scheduleEndRef.current = startAt + duration;
 
         setIsPlaying(true);
         if (playTimerRef.current) clearTimeout(playTimerRef.current);
         const msUntilEnd = (scheduleEndRef.current - now) * 1000;
+        coachAudibleUntilRef.current = Date.now() + msUntilEnd + HALF_DUPLEX_TAIL_MS;
         playTimerRef.current = setTimeout(() => setIsPlaying(false), msUntilEnd + 150);
+        startReveal();
       } catch (e) {
         console.warn("[useGeminiLive] playback failed", e);
       }
     },
-    [ensurePlayback]
+    [ensurePlayback, startReveal]
   );
 
   /**
@@ -164,6 +230,8 @@ export function useGeminiLive(apiKey: string) {
       // queue may not exist yet — nothing to flush
     }
     scheduleEndRef.current = 0;
+    audioTurnStartRef.current = 0;
+    coachAudibleUntilRef.current = 0; // reopen the mic immediately on a barge-in
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
     setIsPlaying(false);
   }, []);
@@ -176,6 +244,8 @@ export function useGeminiLive(apiKey: string) {
         lastSystemPromptRef.current = systemPrompt;
         currentTurnTranscriptRef.current = "";
         currentUserTranscriptRef.current = "";
+        pendingTurnFlushRef.current = false;
+        stopReveal();
         setLiveAssistantText("");
 
         const ws = new WebSocket(`${WS_BASE}?key=${apiKey}`);
@@ -240,6 +310,8 @@ export function useGeminiLive(apiKey: string) {
 
             if (data?.serverContent?.interrupted) {
               flushPlayback();
+              stopReveal();
+              pendingTurnFlushRef.current = false;
               currentTurnTranscriptRef.current = "";
               setLiveAssistantText("");
             }
@@ -279,20 +351,18 @@ export function useGeminiLive(apiKey: string) {
             if (outText) {
               flushUserTranscript();
               currentTurnTranscriptRef.current += outText;
-              setLiveAssistantText(currentTurnTranscriptRef.current);
+              // The reveal loop paces this onto the screen against the audio
+              // clock; it also covers the text-only case where no audio arrives.
+              startReveal();
             }
 
             if (data?.serverContent?.turnComplete) {
               flushUserTranscript();
-              const full = currentTurnTranscriptRef.current.trim();
-              currentTurnTranscriptRef.current = "";
-              setLiveAssistantText("");
-              if (full) {
-                setMessages((prev) => [
-                  ...prev,
-                  { type: "assistant_message", message: { role: "assistant", content: full } },
-                ]);
-              }
+              // Don't commit the turn yet — the server finishes SENDING well
+              // before the speaker finishes SAYING it. finishTurn() fires from
+              // the reveal loop once the queued audio has actually played out.
+              pendingTurnFlushRef.current = true;
+              startReveal();
             }
           } catch {
             // ignore malformed frames
@@ -322,7 +392,7 @@ export function useGeminiLive(apiKey: string) {
           setStatus({ value: "disconnected" });
         };
       }),
-    [apiKey, scheduleAudio, flushPlayback]
+    [apiKey, scheduleAudio, flushPlayback, startReveal, stopReveal]
   );
 
   // ── Microphone ─────────────────────────────────────────────────────────────
@@ -355,17 +425,26 @@ export function useGeminiLive(apiKey: string) {
       sampleRate: 16000,
       channels: 1,
       bitsPerSample: 16,
-      // 7 = VOICE_COMMUNICATION. Was 6 (VOICE_RECOGNITION), which on Android
-      // deliberately BYPASSES the hardware AEC/NS/AGC chain — great for
-      // dictation into a held phone, catastrophic for a speakerphone duplex
-      // call like this one. 7 is Android's echo-cancelled capture path.
-      audioSource: 7,
+      // 6 = VOICE_RECOGNITION. Briefly tried 7 (VOICE_COMMUNICATION) to get
+      // Android's hardware AEC — it swallowed the user's speech entirely.
+      // Android only wires the echo canceller's reference signal correctly when
+      // the whole AudioManager is in MODE_IN_COMMUNICATION; we play through a
+      // normal media AudioContext, so the canceller had no valid reference and
+      // suppressed the near-end voice as if it were echo. Echo is handled by
+      // half-duplex gating below instead, which needs no platform cooperation.
+      audioSource: 6,
       bufferSize: 2048,
     });
 
     LiveAudioStream.on("data", (data: string) => {
       const target = wsTargetRef.current;
       if (isMutedRef.current || !target || target.readyState !== WebSocket.OPEN) return;
+      // HALF-DUPLEX GATE — drop mic frames while the coach is audibly speaking.
+      // Without AEC the mic hears the speaker, Gemini's VAD reads that as the
+      // user talking, and the coach interrupts and restarts itself forever.
+      // Cost: no barge-in on mobile (you can't cut the coach off mid-sentence).
+      // Set HALF_DUPLEX_TAIL_MS = 0 / remove this block to restore barge-in.
+      if (Date.now() < coachAudibleUntilRef.current) return;
       target.send(
         JSON.stringify({
           realtimeInput: {
@@ -444,6 +523,11 @@ export function useGeminiLive(apiKey: string) {
     wsRef.current = null;
 
     if (playTimerRef.current) clearTimeout(playTimerRef.current);
+    stopReveal();
+    pendingTurnFlushRef.current = false;
+    coachAudibleUntilRef.current = 0;
+    audioTurnStartRef.current = 0;
+    setLiveAssistantText("");
     try {
       queueRef.current?.clearBuffers();
       queueRef.current?.stop();
@@ -461,7 +545,7 @@ export function useGeminiLive(apiKey: string) {
 
     setStatus({ value: "disconnected" });
     setIsPlaying(false);
-  }, []);
+  }, [stopReveal]);
 
   /** Reconnect with a new system prompt (phase transitions). Mic stays open. */
   const updateSystemPrompt = useCallback(
