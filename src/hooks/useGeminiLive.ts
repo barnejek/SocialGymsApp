@@ -63,6 +63,11 @@ export function useGeminiLive(apiKey: string) {
   const [isMuted, setIsMuted] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const [lastUserMessage, setLastUserMessage] = useState<string | null>(null);
+  // Coach's current turn, streamed word-by-word for DISPLAY ONLY. `messages`
+  // still flushes once per turn — phase sentinels are matched against complete
+  // turns there, and firing them on half-formed text would trip transitions
+  // early. Cleared when the finished turn lands in `messages`.
+  const [liveAssistantText, setLiveAssistantText] = useState("");
 
   const wsRef = useRef<WebSocket | null>(null);
   const isMutedRef = useRef(false);
@@ -171,6 +176,7 @@ export function useGeminiLive(apiKey: string) {
         lastSystemPromptRef.current = systemPrompt;
         currentTurnTranscriptRef.current = "";
         currentUserTranscriptRef.current = "";
+        setLiveAssistantText("");
 
         const ws = new WebSocket(`${WS_BASE}?key=${apiKey}`);
         // Gemini wraps its JSON in BINARY WebSocket frames. Without this, RN
@@ -235,6 +241,7 @@ export function useGeminiLive(apiKey: string) {
             if (data?.serverContent?.interrupted) {
               flushPlayback();
               currentTurnTranscriptRef.current = "";
+              setLiveAssistantText("");
             }
 
             const parts: unknown[] = data?.serverContent?.modelTurn?.parts ?? [];
@@ -272,12 +279,14 @@ export function useGeminiLive(apiKey: string) {
             if (outText) {
               flushUserTranscript();
               currentTurnTranscriptRef.current += outText;
+              setLiveAssistantText(currentTurnTranscriptRef.current);
             }
 
             if (data?.serverContent?.turnComplete) {
               flushUserTranscript();
               const full = currentTurnTranscriptRef.current.trim();
               currentTurnTranscriptRef.current = "";
+              setLiveAssistantText("");
               if (full) {
                 setMessages((prev) => [
                   ...prev,
@@ -506,6 +515,7 @@ export function useGeminiLive(apiKey: string) {
     isMuted,
     isPlaying,
     lastUserMessage,
+    liveAssistantText,
     connect,
     disconnect,
     updateSystemPrompt,

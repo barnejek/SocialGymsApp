@@ -107,6 +107,10 @@ const faceApiHtml = `
           window.ReactNativeWebView.postMessage(JSON.stringify({ type: 'metrics', data: metrics }));
         }
       };
+      // Assigning src is what actually triggers the decode + onload above.
+      // Omitting it meant onload never fired, no detection ever ran, and the
+      // presence panel sat on NEUTRAL_METRICS for the whole session.
+      img.src = data;
     }
 
     // Android RN WebView

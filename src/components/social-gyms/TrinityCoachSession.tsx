@@ -654,6 +654,18 @@ export const TrinityCoachSession = ({
                   </View>
                 );
               })}
+              {/* Coach's in-flight turn, streamed as it's spoken. Re-renders as
+                  a normal bubble above once the turn completes. */}
+              {gemini.liveAssistantText ? (
+                <View className="mb-3 items-start">
+                  <Text className="text-[10px] font-semibold mb-1 px-1" style={{ color: SPEAKER_META.coach.color }}>
+                    {SPEAKER_META.coach.name}
+                  </Text>
+                  <View className="rounded-2xl rounded-bl-sm px-4 py-2.5 max-w-[85%] bg-surface-2 opacity-80">
+                    <Text className="text-sm text-foreground">{gemini.liveAssistantText}</Text>
+                  </View>
+                </View>
+              ) : null}
             </ScrollView>
             <View className="border-t border-border bg-surface-2 px-4 py-2.5">
               <Text className="text-[11px] text-muted-foreground" numberOfLines={2}>{PHASE_HINT[phase]}</Text>
