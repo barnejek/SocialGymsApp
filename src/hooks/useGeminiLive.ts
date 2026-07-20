@@ -94,17 +94,30 @@ export function useGeminiLive(apiKey: string) {
     let ctx = playCtxRef.current;
     if (!ctx || ctx.state === "closed") {
       ctx = new AudioContext({ sampleRate: PLAYBACK_SAMPLE_RATE });
-      playCtxRef.current = ctx;
       scheduleEndRef.current = 0;
       const queue = ctx.createBufferQueueSource();
       queue.connect(ctx.destination);
-      queue.start();
+      // react-native-audio-api 0.13.x declares
+      // `start(when = 0, offset = -1)` and then throws RangeError when
+      // `offset < 0` — so the zero-arg call ALWAYS throws. Pass (0, 0)
+      // explicitly. Refs are assigned only after start() succeeds, otherwise a
+      // live-but-unstarted context would be cached and every later frame would
+      // hit `enqueueBuffer of null` forever.
+      try {
+        queue.start(0, 0);
+      } catch (e) {
+        void ctx.close(); // don't leak a context per audio frame if start fails
+        throw e;
+      }
+      playCtxRef.current = ctx;
       queueRef.current = queue;
     }
     if (ctx.state === "suspended") {
       void ctx.resume();
     }
-    return { ctx, queue: queueRef.current! };
+    const queue = queueRef.current;
+    if (!queue) throw new Error("playback queue unavailable");
+    return { ctx, queue };
   }, []);
 
   const scheduleAudio = useCallback(
