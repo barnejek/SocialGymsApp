@@ -7,7 +7,8 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AudioContext, type AudioBufferQueueSourceNode } from "react-native-audio-api";
+import { Platform } from "react-native";
+import { AudioContext, AudioManager, type AudioBufferQueueSourceNode } from "react-native-audio-api";
 import { Buffer } from "buffer";
 
 // Native module — unavailable in Expo Go / web. Soft-require so Metro can still bundle.
@@ -145,6 +146,23 @@ export function useGeminiLive(apiKey: string) {
     [ensurePlayback]
   );
 
+  /**
+   * Drop every buffer the coach hasn't spoken yet. Gemini sends
+   * `serverContent.interrupted` when it decides the user barged in; without
+   * this the already-queued audio keeps playing over the new turn, which the
+   * mic then re-feeds to the VAD — the interruption loop feeding itself.
+   */
+  const flushPlayback = useCallback(() => {
+    try {
+      queueRef.current?.clearBuffers();
+    } catch {
+      // queue may not exist yet — nothing to flush
+    }
+    scheduleEndRef.current = 0;
+    if (playTimerRef.current) clearTimeout(playTimerRef.current);
+    setIsPlaying(false);
+  }, []);
+
   // ── WebSocket ──────────────────────────────────────────────────────────────
 
   const openWs = useCallback(
@@ -213,6 +231,11 @@ export function useGeminiLive(apiKey: string) {
             reconnectAttemptsRef.current = 0;
             // Explicit setup ack → safe to start streaming mic audio now.
             if (data?.setupComplete) settle(ws);
+
+            if (data?.serverContent?.interrupted) {
+              flushPlayback();
+              currentTurnTranscriptRef.current = "";
+            }
 
             const parts: unknown[] = data?.serverContent?.modelTurn?.parts ?? [];
             for (const part of parts as Record<string, unknown>[]) {
@@ -290,7 +313,7 @@ export function useGeminiLive(apiKey: string) {
           setStatus({ value: "disconnected" });
         };
       }),
-    [apiKey, scheduleAudio]
+    [apiKey, scheduleAudio, flushPlayback]
   );
 
   // ── Microphone ─────────────────────────────────────────────────────────────
@@ -304,11 +327,30 @@ export function useGeminiLive(apiKey: string) {
     }
     if (micStartedRef.current) return;
 
+    // ECHO CANCELLATION — without it the mic hears the coach through the
+    // speaker, Gemini's VAD scores that as the user talking, and the coach
+    // barges in on itself and restarts its turn, forever. The web hook gets
+    // this free via getUserMedia({ echoCancellation: true }); native has to ask
+    // for it explicitly, per platform.
+    if (Platform.OS === "ios") {
+      // `voiceChat` mode puts AVAudioSession on the VPIO (voice-processing)
+      // path, which is what actually enables AEC + noise suppression on iOS.
+      AudioManager.setAudioSessionOptions({
+        iosCategory: "playAndRecord",
+        iosMode: "voiceChat",
+        iosOptions: ["defaultToSpeaker", "allowBluetoothHFP"],
+      });
+    }
+
     LiveAudioStream.init({
       sampleRate: 16000,
       channels: 1,
       bitsPerSample: 16,
-      audioSource: 6, // VOICE_RECOGNITION on Android
+      // 7 = VOICE_COMMUNICATION. Was 6 (VOICE_RECOGNITION), which on Android
+      // deliberately BYPASSES the hardware AEC/NS/AGC chain — great for
+      // dictation into a held phone, catastrophic for a speakerphone duplex
+      // call like this one. 7 is Android's echo-cancelled capture path.
+      audioSource: 7,
       bufferSize: 2048,
     });
 
