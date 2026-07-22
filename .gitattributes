@@ -1,0 +1,3 @@
+# Normalize line endings: store LF in the repo, check out native.
+# Stops the CRLF<->LF churn that flagged the whole tree as modified.
+* text=auto
