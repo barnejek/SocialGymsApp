@@ -24,7 +24,7 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          href: null as any // Intelligent router screen, hidden from tabs
+          href: null // Intelligent router screen, hidden from tabs
         }}
       />
       <Tabs.Screen
@@ -32,7 +32,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={24} />,
-          href: (user?.persona === 'b2c_user' ? '/(tabs)/dashboard' : null) as any
+          href: user?.persona === 'b2c_user' ? '/(tabs)/dashboard' : null
         }}
       />
       <Tabs.Screen
@@ -40,7 +40,7 @@ export default function TabLayout() {
         options={{
           title: 'Science',
           tabBarIcon: ({ color }) => <FlaskConical color={color} size={24} />,
-          href: (user?.persona === 'b2c_user' ? '/(tabs)/science' : null) as any
+          href: user?.persona === 'b2c_user' ? '/(tabs)/science' : null
         }}
       />
       <Tabs.Screen
@@ -48,7 +48,7 @@ export default function TabLayout() {
         options={{
           title: 'Skills',
           tabBarIcon: ({ color }) => <Award color={color} size={24} />,
-          href: (user?.persona === 'b2c_user' ? '/(tabs)/skills' : null) as any
+          href: user?.persona === 'b2c_user' ? '/(tabs)/skills' : null
         }}
       />
       <Tabs.Screen
@@ -56,7 +56,7 @@ export default function TabLayout() {
         options={{
           title: 'Enterprise',
           tabBarIcon: ({ color }) => <Settings color={color} size={24} />,
-          href: (isEducator ? '/(tabs)/enterprise' : null) as any
+          href: isEducator ? '/(tabs)/enterprise' : null
         }}
       />
       <Tabs.Screen
@@ -64,7 +64,7 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           tabBarIcon: ({ color }) => <LayoutDashboard color={color} size={24} />,
-          href: (user?.persona === 'b2b_autism_user' ? '/(tabs)/autism-home' : null) as any
+          href: user?.persona === 'b2b_autism_user' ? '/(tabs)/autism-home' : null
         }}
       />
       <Tabs.Screen
@@ -72,19 +72,19 @@ export default function TabLayout() {
         options={{
           title: 'Train',
           tabBarIcon: ({ color }) => <Dumbbell color={color} size={24} />,
-          href: '/(tabs)/train' as any
+          href: '/(tabs)/train'
         }}
       />
       <Tabs.Screen
         name="profile"
         options={{
-          href: null as any // Hidden from tab bar, accessed via Dashboard
+          href: null // Hidden from tab bar, accessed via Dashboard
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          href: null as any // Hidden from tab bar, accessed via the B2C Dashboard "Workouts" card
+          href: null // Hidden from tab bar, accessed via the B2C Dashboard "Workouts" card
         }}
       />
     </Tabs>

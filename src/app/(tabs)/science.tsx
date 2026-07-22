@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Repeat2, Dumbbell, MessagesSquare, Eye } from 'lucide-react-native';
+import { Repeat2, Dumbbell, MessagesSquare, Eye, type LucideIcon } from 'lucide-react-native';
 import { COLORS } from '../../constants/colors';
 
 /**
@@ -23,7 +23,7 @@ const STEPS: Array<{ n: number; label: string; method: string }> = [
   { n: 6, label: 'Debrief', method: 'Homework + Golden Rule' },
 ];
 
-const PILLARS: Array<{ icon: any; title: string; body: string }> = [
+const PILLARS: Array<{ icon: LucideIcon; title: string; body: string }> = [
   {
     icon: Repeat2,
     title: 'Behavioral rehearsal',

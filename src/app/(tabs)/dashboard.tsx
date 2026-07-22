@@ -203,7 +203,7 @@ export default function DashboardScreen() {
           </View>
           <View className="flex-row items-center gap-x-3">
             <TouchableOpacity
-              onPress={() => router.push('/(tabs)/profile' as any)}
+              onPress={() => router.push('/(tabs)/profile')}
               accessibilityLabel="Profile settings"
               className="h-10 w-10 bg-surface rounded-full border border-border items-center justify-center"
             >
@@ -273,7 +273,7 @@ export default function DashboardScreen() {
         )}
 
         <TouchableOpacity
-          onPress={() => router.push('/(tabs)/train' as any)}
+          onPress={() => router.push('/(tabs)/train')}
           className="bg-primary rounded-3xl p-6 mb-6 flex-row items-center justify-between"
         >
           <View>
@@ -293,7 +293,7 @@ export default function DashboardScreen() {
         {state && <PresencePanel state={state} />}
 
         <TouchableOpacity
-          onPress={() => router.push('/(tabs)/history' as any)}
+          onPress={() => router.push('/(tabs)/history')}
           className="bg-surface border border-border rounded-2xl p-5 mb-6 flex-row items-center justify-between"
           accessibilityLabel="Workout history"
         >

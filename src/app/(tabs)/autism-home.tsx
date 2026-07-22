@@ -70,7 +70,7 @@ export default function AutismHomeScreen() {
 
         {/* Low Stimulus Start Button */}
         <TouchableOpacity 
-          onPress={() => router.push('/(tabs)/train' as any)}
+          onPress={() => router.push('/(tabs)/train')}
           className="bg-primary/90 rounded-2xl p-6 mb-12 flex-row items-center justify-center"
         >
           <Play color="#ffffff" size={24} fill="#ffffff" />

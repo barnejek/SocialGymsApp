@@ -500,7 +500,11 @@ export const topics: Topic[] = [
   },
 ];
 
-export const getTopic = (id: TopicId) => topics.find((t) => t.id === id)!;
+export const getTopic = (id: TopicId) => {
+  const topic = topics.find((t) => t.id === id);
+  if (!topic) throw new Error(`getTopic: unknown topic id "${id}"`);
+  return topic;
+};
 
 /** The four topics shown on the classic (pre-gym) topic pickers. */
 export const CORE_TOPIC_IDS: TopicId[] = [
